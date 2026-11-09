@@ -633,6 +633,9 @@ mod tests {
         }
     }
 
+    /// The tests that change pf share the state of the machine, so they run one at a time.
+    static PF_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     /// Resets the firewall when the test ends, also when it fails.
     struct ResetOnDrop(Firewall);
 
@@ -647,6 +650,7 @@ mod tests {
     #[test]
     #[ignore = "changes the pf configuration of the machine, requires root"]
     fn applies_and_resets_policy() {
+        let _lock = PF_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let was_enabled = is_enabled().unwrap();
         let mut firewall = ResetOnDrop(Firewall::new().unwrap());
 
@@ -682,6 +686,7 @@ mod tests {
     #[test]
     #[ignore = "changes the pf configuration of the machine, requires root"]
     fn keeps_a_main_ruleset_that_references_the_anchor() {
+        let _lock = PF_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         let was_enabled = is_enabled().unwrap();
 
         let marker = "block drop in quick proto tcp to port 9";
