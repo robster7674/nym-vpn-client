@@ -35,9 +35,17 @@ pub struct SysInfo {
 
 impl SysInfo {
     pub fn new() -> Self {
-        let system_name = System::name().unwrap_or("unknown".to_owned());
-        let os_version = System::long_os_version().unwrap_or_else(|| env::consts::OS.into());
-        let arch = System::cpu_arch();
+        // Some platforms report values with trailing whitespace. FreeBSD ends the kernel version
+        // with a newline, which is not valid in an HTTP header.
+        let system_name = System::name()
+            .unwrap_or("unknown".to_owned())
+            .trim()
+            .to_owned();
+        let os_version = System::long_os_version()
+            .unwrap_or_else(|| env::consts::OS.into())
+            .trim()
+            .to_owned();
+        let arch = System::cpu_arch().trim().to_owned();
         let extra_metadata = Self::extra_metadata()
             .into_iter()
             .map(|(k, v)| format!("{k}: {v}"))
