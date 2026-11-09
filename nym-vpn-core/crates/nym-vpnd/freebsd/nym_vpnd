@@ -11,6 +11,7 @@
 # nym_vpnd_args="-v"       # optional, flags for nym-vpnd, default "-v"
 # nym_vpnd_flags=""        # optional, flags for daemon(8), which supervises nym-vpnd
 #
+# The log goes to syslog (/var/log/messages) under the tag nym-vpnd.
 # The daemon is controlled with nym-vpnc. Users in the "nym-vpn" group are allowed to
 # control it, so add yours with: pw groupmod nym-vpn -m <user>
 
@@ -27,7 +28,7 @@ load_rc_config $name
 
 pidfile="/var/run/${name}.pid"
 command="/usr/sbin/daemon"
-command_args="-R 2 -P ${pidfile} -t ${name} /usr/local/bin/nym-vpnd ${nym_vpnd_args} run-as-service"
+command_args="-R 2 -S -T nym-vpnd -P ${pidfile} -t ${name} /usr/local/bin/nym-vpnd ${nym_vpnd_args} run-as-service"
 
 # nym-vpnd needs the pf kernel module for the firewall (kill switch).
 required_modules="pf"
