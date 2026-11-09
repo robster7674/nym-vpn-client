@@ -594,4 +594,41 @@ mod tests {
             );
         }
     }
+
+    /// Resets the firewall when the test ends, also when it fails.
+    struct ResetOnDrop(Firewall);
+
+    impl Drop for ResetOnDrop {
+        fn drop(&mut self) {
+            let _ = self.0.reset_policy();
+        }
+    }
+
+    /// Loads a policy into pf and removes it again. This blocks all network traffic for the
+    /// duration of the test, including an SSH session to the machine.
+    #[test]
+    #[ignore = "changes the pf configuration of the machine, requires root"]
+    fn applies_and_resets_policy() {
+        let was_enabled = is_enabled().unwrap();
+        let mut firewall = ResetOnDrop(Firewall::new().unwrap());
+
+        firewall
+            .0
+            .apply_policy(FirewallPolicy::Blocked {
+                allow_lan: false,
+                allowed_endpoints: vec![peer()],
+            })
+            .unwrap();
+
+        assert!(is_enabled().unwrap());
+        let anchor_rules = pfctl(&["-a", ANCHOR_NAME, "-s", "rules"]).unwrap();
+        assert!(anchor_rules.contains("203.0.113.7"), "{anchor_rules}");
+        assert!(anchor_rules.contains("block drop quick all"), "{anchor_rules}");
+        assert!(pfctl(&["-s", "rules"]).unwrap().contains("anchor \"nym\""));
+
+        firewall.0.reset_policy().unwrap();
+
+        assert_eq!(is_enabled().unwrap(), was_enabled);
+        assert!(pfctl(&["-a", ANCHOR_NAME, "-s", "rules"]).unwrap().trim().is_empty());
+    }
 }
