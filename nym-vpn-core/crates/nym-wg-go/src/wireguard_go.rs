@@ -177,7 +177,7 @@ impl Tunnel {
     /// Start new WireGuard tunnel with TUN fd.
     #[cfg(not(windows))]
     fn start_with_tun(config: Config, tun_fd: OwnedFd) -> Result<Self> {
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
         let interface_mtu = config.interface.mtu;
         let settings = CString::new(config.into_uapi_config())
             .map_err(|_| Error::ConvertToCString("uapi config"))?;
@@ -185,7 +185,7 @@ impl Tunnel {
         let tunnel_handle = unsafe {
             wgTurnOn(
                 // note: not all platforms accept mtu = 0
-                #[cfg(any(target_os = "linux", target_os = "macos"))]
+                #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
                 i32::from(interface_mtu),
                 settings.as_ptr(),
                 tun_fd.into_raw_fd(),
@@ -545,7 +545,7 @@ unsafe extern "C" {
     /// Start the tunnel.
     #[cfg(not(windows))]
     unsafe fn wgTurnOn(
-        #[cfg(any(target_os = "linux", target_os = "macos"))] mtu: i32,
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))] mtu: i32,
         settings: *const c_char,
         fd: RawFd,
         logging_callback: LoggingCallback,
