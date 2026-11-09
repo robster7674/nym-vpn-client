@@ -117,7 +117,7 @@
       <div><span class="label">Daemon and CLI</span><span class="value"><span class="pill ok">Working</span></span><span>status, info, gateway list (632 WireGuard gateways)</span></div>
       <div><span class="label">Kill switch, DNS, routes</span><span class="value"><span class="pill ok">Tested live</span></span><span>pf, resolvconf, route(8) on a real VM</span></div>
       <div><span class="label">End-to-end tunnel</span><span class="value"><span class="pill wait">Needs account</span></span><span>no Nym credentials on the test VM, <a href="https://github.com/robster7674/nym-vpn-client/issues/4">#4</a></span></div>
-      <div><span class="label">arm64 build</span><span class="value"><span class="pill wait">Workaround found</span></span><span>libwg builds with a patched Go table, full link being checked, <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a></span></div>
+      <div><span class="label">arm64 build</span><span class="value"><span class="pill ok">Builds and runs</span></span><span>daemon links and answers on arm64 with a patched Go table, tunnel untested, <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a></span></div>
       <div><span class="label">Upstream</span><span class="value"><span class="pill ok">Untouched</span></span><span>nothing filed or posted to nymtech</span></div>
     </div>
   </section>
@@ -183,7 +183,7 @@
       </div>
       <div class="finding">
         <h3>Go cannot build the WireGuard archive on arm64</h3>
-        <p><code>-buildmode=c-archive</code> is not listed for freebsd/arm64 in Go's platform table, although the runtime has the library entry point. <strong>Worked around:</strong> the build script now builds the Go tools from a patched copy of GOROOT (a one-line diff, in the same style as the existing Android and macOS runtime patches) and <code>libwg.a</code> builds on arm64. Whether the resulting daemon runs is still being checked, in <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a>. A longer-term option is FreeBSD's in-kernel WireGuard (<code>if_wg</code>), in <a href="https://github.com/robster7674/nym-vpn-client/issues/6">#6</a>.</p>
+        <p><code>-buildmode=c-archive</code> is not listed for freebsd/arm64 in Go's platform table, although the runtime has the library entry point. <strong>Worked around:</strong> the build script now builds the Go tools from a patched copy of GOROOT (a one-line diff, in the same style as the existing Android and macOS runtime patches) and <code>libwg.a</code> builds on arm64. The arm64 daemon now links, starts and lists gateways. A WireGuard tunnel on arm64 is untested. Tracked in <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a>. A longer-term option is FreeBSD's in-kernel WireGuard (<code>if_wg</code>), in <a href="https://github.com/robster7674/nym-vpn-client/issues/6">#6</a>.</p>
       </div>
       <div class="finding">
         <h3>A custom pf ruleset was suspended while connected</h3>
@@ -212,8 +212,9 @@
         <tr><td>Start <code>nym-vpnd</code>, <code>nym-vpnc status</code>, <code>info</code>, <code>gateway list wg</code></td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
         <tr><td>rc.d script: start, status, restart, stop, socket cleanup</td><td>amd64</td><td><span class="pill ok">Pass</span> after two fixes to the daemon(8) flags</td></tr>
         <tr><td>Build <code>libwg.a</code> with the build script</td><td>arm64</td><td><span class="pill ok">Pass</span> with the patched Go table</td></tr>
-        <tr><td>cargo build and link <code>nym-vpnd</code>, firewall, routing and DNS tests</td><td>arm64</td><td><span class="pill wait">Running</span></td></tr>
-        <tr><td>Connect through the mixnet or WireGuard</td><td>amd64</td><td><span class="pill wait">Not run</span> needs a Nym account</td></tr>
+        <tr><td>cargo build and link <code>nym-vpnd</code></td><td>arm64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>Firewall, route and DNS live tests; daemon start, status, gateway list (638 gateways)</td><td>arm64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>Connect through the mixnet or WireGuard</td><td>amd64, arm64</td><td><span class="pill wait">Not run</span> needs a Nym account</td></tr>
         <tr><td>Linux, macOS and Windows builds unchanged</td><td>GitHub runners</td><td><span class="pill wait">Running</span> the fork has no access to upstream's self-hosted runners, so a throwaway workflow on a separate branch runs <code>cargo check</code> instead, <a href="https://github.com/robster7674/nym-vpn-client/issues/9">#9</a></td></tr>
       </tbody>
     </table></div>
@@ -227,7 +228,7 @@
       <div class="phase"><span class="eyebrow">Phase 2 <span class="pill ok">Done</span></span><h3>DNS</h3><p>resolvconf backend verified live.</p></div>
       <div class="phase"><span class="eyebrow">Phase 3 <span class="pill wait">First version</span></span><h3>Kill switch</h3><p>pf policy verified live. Keeps the host ruleset when it references the anchor, otherwise replaces it with a warning.</p></div>
       <div class="phase"><span class="eyebrow">Phase 4 <span class="pill ok">Done on amd64</span></span><h3>IPC and rc.d</h3><p>Peer-credential auth built. <code>service nym_vpnd</code> starts, restarts and stops the daemon. Access for non-root users in the <code>nym-vpn</code> group is not tested yet, because debug builds skip the check.</p></div>
-      <div class="phase"><span class="eyebrow">Phase 5 <span class="pill wait">Not started</span></span><h3>WireGuard mode</h3><p>Compiles on amd64. Untested, and blocked on arm64.</p></div>
+      <div class="phase"><span class="eyebrow">Phase 5 <span class="pill wait">Built, untested</span></span><h3>WireGuard mode</h3><p>libwg builds and links on amd64 and arm64. No tunnel has been brought up yet.</p></div>
       <div class="phase"><span class="eyebrow">Phase 6 <span class="pill wait">Waiting on Rob</span></span><h3>Upstream</h3><p>A FreeBSD-only issue with real compile output and the questions maintainers need to answer. Nothing posted.</p></div>
     </div>
   </section>
@@ -237,7 +238,7 @@
     <ul class="plain">
       <li><strong>Needed from Rob:</strong> a Nym account on the amd64 VM, to run <code>nym-vpnc connect</code> and check routes, DNS and the kill switch with real traffic. <a href="https://github.com/robster7674/nym-vpn-client/issues/4">#4</a></li>
       <li><strong>pf main ruleset:</strong> a host that does not reference the anchor still has its rules suspended while a policy is active. Merging the anchor in automatically is the remaining part. <a href="https://github.com/robster7674/nym-vpn-client/issues/3">#3</a></li>
-      <li><strong>arm64 WireGuard:</strong> libwg builds with a patched Go table, the running daemon is still to be confirmed. <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a> A native <code>if_wg</code> backend is <a href="https://github.com/robster7674/nym-vpn-client/issues/6">#6</a>.</li>
+      <li><strong>arm64 WireGuard:</strong> libwg builds with a patched Go table and the daemon runs. A WireGuard tunnel on arm64 still needs the account test. <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a> A native <code>if_wg</code> backend is <a href="https://github.com/robster7674/nym-vpn-client/issues/6">#6</a>.</li>
       <li><strong>Client access control:</strong> the group check is only exercised by a release build. <a href="https://github.com/robster7674/nym-vpn-client/issues/5">#5</a></li>
       <li><strong>Not covered yet:</strong> split tunnelling (<a href="https://github.com/robster7674/nym-vpn-client/issues/8">#8</a>) and a native routing socket instead of <code>route(8)</code> (<a href="https://github.com/robster7674/nym-vpn-client/issues/7">#7</a>). The Tauri desktop app is out of scope.</li>
       <li><strong>Before a pull request:</strong> a green CI run on the other platforms and rustfmt with the repo's nightly settings. <a href="https://github.com/robster7674/nym-vpn-client/issues/9">#9</a></li>
@@ -258,6 +259,7 @@ cd nym-vpn-core &amp;&amp; cargo build -p nym-vpnd -p nym-vpnc</pre>
   <section aria-labelledby="log">
     <h2 id="log">Update log</h2>
     <div class="log">
+      <div><span class="when">2026-11-09 arm64</span><span>arm64: nym-vpnd builds, links and runs; firewall, route and DNS live tests pass; gateway list works. Remaining arm64 work is a real tunnel.</span></div>
       <div><span class="when">2026-11-09 PR</span><span>Draft pull request <a href="https://github.com/robster7674/nym-vpn-client/pull/11">#11</a> opened on the fork only. <code>libwg.a</code> builds on arm64 through a patched Go platform table. The pf backend keeps a host ruleset that references the anchor. A throwaway workflow checks Linux, macOS and Windows.</span></div>
       <div><span class="when">2026-11-09 issues</span><span>Issues <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a> to <a href="https://github.com/robster7674/nym-vpn-client/issues/10">#10</a> filed on the fork for the open items. The report source now lives in the repository at <code>nym-vpn-core/docs/freebsd-port-report.html</code> and is committed with each update.</span></div>
       <div><span class="when">2026-11-09 later</span><span>rc.d script verified on amd64 (start, status, restart, stop). The arm64 VM is still compiling its first full check.</span></div>
