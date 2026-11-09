@@ -5,11 +5,15 @@
 //! FreeBSD firewall implemented with pf(4).
 //!
 //! The rules of a policy are rendered as pf.conf text and loaded into the `nym` anchor with
-//! pfctl(8). The anchor is referenced from the main ruleset, which this module replaces while a
-//! policy is active. When the policy is reset, the main ruleset is restored from `/etc/pf.conf`
-//! if pf was enabled before, and pf is disabled again if it was not.
+//! pfctl(8). The anchor has to be referenced from the main ruleset to take effect.
 //!
-//! Not supported yet: split tunnelling and a main ruleset that is not loaded from `/etc/pf.conf`.
+//! If the main ruleset already contains `anchor "nym"`, for example because the host administrator
+//! added it as the first filter rule to `/etc/pf.conf`, it is left alone and only the anchor is
+//! changed. Otherwise this module replaces the main ruleset with one that only evaluates the
+//! anchor, and restores it from `/etc/pf.conf` when the policy is reset. Custom rules are then
+//! suspended while a policy is active.
+//!
+//! Not supported yet: split tunnelling.
 
 use std::{
     fmt::Write as _,
@@ -47,6 +51,8 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct Firewall {
     /// Whether pf was enabled before this firewall first enabled it.
     pf_was_enabled: Option<bool>,
+    /// Whether the main ruleset was replaced because it did not reference the anchor.
+    replaced_main_ruleset: bool,
 }
 
 impl Firewall {
@@ -64,6 +70,7 @@ impl Firewall {
 
         Ok(Firewall {
             pf_was_enabled: None,
+            replaced_main_ruleset: false,
         })
     }
 
@@ -72,7 +79,15 @@ impl Firewall {
             self.pf_was_enabled = Some(is_enabled()?);
         }
 
-        pfctl_load(&[], &main_ruleset())?;
+        if !self.replaced_main_ruleset && !main_ruleset_references_anchor()? {
+            tracing::warn!(
+                "The pf ruleset does not reference the \"{ANCHOR_NAME}\" anchor. Replacing it while \
+                 the policy is active. Add `anchor \"{ANCHOR_NAME}\"` as the first filter rule to \
+                 {PF_CONF} to keep your own rules."
+            );
+            pfctl_load(&[], &main_ruleset())?;
+            self.replaced_main_ruleset = true;
+        }
         pfctl_load(&["-a", ANCHOR_NAME], &generate_rules(&policy))?;
         enable()?;
 
@@ -89,6 +104,15 @@ impl Firewall {
     }
 
     fn restore_state(&mut self) -> Result<()> {
+        let replaced_main_ruleset = std::mem::take(&mut self.replaced_main_ruleset);
+        if !replaced_main_ruleset {
+            // The main ruleset is the host's own, so only pf itself is put back.
+            return match self.pf_was_enabled.take() {
+                Some(false) => pfctl(&["-d"]).map(|_| ()),
+                _ => Ok(()),
+            };
+        }
+
         match self.pf_was_enabled.take() {
             Some(true) => {
                 if Path::new(PF_CONF).exists() {
@@ -110,6 +134,14 @@ impl Firewall {
 /// The main ruleset that evaluates the anchor.
 fn main_ruleset() -> String {
     format!("set skip on lo0\nscrub in all fragment reassemble\nanchor \"{ANCHOR_NAME}\"\n")
+}
+
+/// Whether the main ruleset evaluates the anchor.
+fn main_ruleset_references_anchor() -> Result<bool> {
+    let rules = pfctl(&["-s", "rules"])?;
+    Ok(rules
+        .lines()
+        .any(|line| line.trim_start().starts_with(&format!("anchor \"{ANCHOR_NAME}\""))))
 }
 
 fn is_enabled() -> Result<bool> {
@@ -644,5 +676,39 @@ mod tests {
                 .trim()
                 .is_empty()
         );
+    }
+
+    /// A main ruleset that already references the anchor is kept as it is.
+    #[test]
+    #[ignore = "changes the pf configuration of the machine, requires root"]
+    fn keeps_a_main_ruleset_that_references_the_anchor() {
+        let was_enabled = is_enabled().unwrap();
+
+        let marker = "block drop in quick proto tcp to port 9";
+        pfctl_load(&[], &format!("set skip on lo0\nanchor \"{ANCHOR_NAME}\"\n{marker}\n")).unwrap();
+        let mut firewall = ResetOnDrop(Firewall::new().unwrap());
+
+        firewall
+            .0
+            .apply_policy(FirewallPolicy::Blocked {
+                allow_lan: false,
+                allowed_endpoints: vec![peer()],
+            })
+            .unwrap();
+        let during = pfctl(&["-s", "rules"]).unwrap();
+        assert!(during.contains("port = discard"), "{during}");
+        assert!(!firewall.0.replaced_main_ruleset);
+
+        firewall.0.reset_policy().unwrap();
+        let after = pfctl(&["-s", "rules"]).unwrap();
+        assert!(after.contains("anchor \"nym\""), "{after}");
+        assert!(after.contains("port = discard"), "{after}");
+        assert_eq!(is_enabled().unwrap(), was_enabled);
+
+        // Put the machine back as it was.
+        pfctl_load(&[], "").unwrap();
+        if !was_enabled {
+            let _ = pfctl(&["-d"]);
+        }
     }
 }
