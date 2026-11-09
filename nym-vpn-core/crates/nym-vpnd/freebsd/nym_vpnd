@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# PROVIDE: nym_vpnd
+# REQUIRE: NETWORKING resolv
+# KEYWORD: shutdown
+#
+# Add the following to /etc/rc.conf to enable the NymVPN daemon:
+#
+# nym_vpnd_enable="YES"
+#
+# nym_vpnd_flags="-v"      # optional, extra flags for nym-vpnd, default "-v"
+#
+# The daemon is controlled with nym-vpnc. Users in the "nym-vpn" group are allowed to
+# control it, so add yours with: pw groupmod nym-vpn -m <user>
+
+. /etc/rc.subr
+
+name="nym_vpnd"
+rcvar="nym_vpnd_enable"
+desc="NymVPN daemon"
+
+load_rc_config $name
+
+: ${nym_vpnd_enable:="NO"}
+: ${nym_vpnd_flags:="-v"}
+
+pidfile="/var/run/${name}.pid"
+command="/usr/sbin/daemon"
+procname="/usr/local/bin/nym-vpnd"
+command_args="-r -R 2 -P ${pidfile} -t ${name} /usr/local/bin/nym-vpnd ${nym_vpnd_flags} run-as-service"
+
+# nym-vpnd needs the pf kernel module for the firewall (kill switch).
+required_modules="pf"
+
+run_rc_command "$1"

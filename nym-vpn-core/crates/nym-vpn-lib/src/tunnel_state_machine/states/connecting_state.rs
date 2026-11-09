@@ -1167,7 +1167,11 @@ impl ConnectingPolicyParameters {
                     tracing::info!("In policy lp ep: {addr}");
                     AllowedEndpoint::new(
                         Endpoint::from_socket_address(*addr, TransportProtocol::Tcp),
-                        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
+                        #[cfg(any(
+                            target_os = "linux",
+                            target_os = "macos",
+                            target_os = "freebsd"
+                        ))]
                         AllowedClients::Root,
                         #[cfg(target_os = "windows")]
                         AllowedClients::current_exe(),

@@ -7,13 +7,7 @@
 //! from `route -n get`. Changes to the default routes are detected by polling. A native `PF_ROUTE`
 //! implementation can replace this later without changing the public API.
 
-use std::{
-    collections::HashSet,
-    ffi::CString,
-    net::IpAddr,
-    process::Stdio,
-    time::Duration,
-};
+use std::{collections::HashSet, ffi::CString, net::IpAddr, process::Stdio, time::Duration};
 
 use ipnetwork::IpNetwork;
 use tokio::{process::Command, sync::mpsc};
@@ -171,9 +165,14 @@ impl RouteManagerImpl {
         Ok(())
     }
 
-    fn resolve_node(&self, route: &RequiredRoute) -> Result<(Option<IpAddr>, Option<String>), Error> {
+    fn resolve_node(
+        &self,
+        route: &RequiredRoute,
+    ) -> Result<(Option<IpAddr>, Option<String>), Error> {
         match &route.node {
-            NetNode::RealNode(node) => Ok((node.get_address(), node.get_device().map(String::from))),
+            NetNode::RealNode(node) => {
+                Ok((node.get_address(), node.get_device().map(String::from)))
+            }
             NetNode::DefaultNode => {
                 let default_route = if route.prefix.is_ipv4() {
                     &self.default_routes.0
@@ -181,7 +180,10 @@ impl RouteManagerImpl {
                     &self.default_routes.1
                 };
                 let default_route = default_route.as_ref().ok_or(Error::NoDefaultRoute)?;
-                Ok((default_route.router_ip, Some(default_route.interface.clone())))
+                Ok((
+                    default_route.router_ip,
+                    Some(default_route.interface.clone()),
+                ))
             }
         }
     }
@@ -265,9 +267,10 @@ pub async fn get_default_route_interfaces(
 }
 
 fn is_tunnel_like_interface(name: &str) -> bool {
-    TUNNEL_INTERFACE_PREFIXES
-        .iter()
-        .any(|prefix| name.strip_prefix(prefix).is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_digit())))
+    TUNNEL_INTERFACE_PREFIXES.iter().any(|prefix| {
+        name.strip_prefix(prefix)
+            .is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_digit()))
+    })
 }
 
 fn family_flag(is_ipv4: bool) -> &'static str {
@@ -317,7 +320,10 @@ fn push_destination(args: &mut Vec<String>, prefix: &IpNetwork) {
     if prefix.prefix() == host_prefix {
         args.extend(["-host".to_owned(), prefix.ip().to_string()]);
     } else {
-        args.extend(["-net".to_owned(), format!("{}/{}", prefix.network(), prefix.prefix())]);
+        args.extend([
+            "-net".to_owned(),
+            format!("{}/{}", prefix.network(), prefix.prefix()),
+        ]);
     }
 }
 

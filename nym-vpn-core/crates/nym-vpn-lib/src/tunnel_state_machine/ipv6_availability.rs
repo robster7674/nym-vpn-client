@@ -34,7 +34,12 @@ pub async fn is_ipv6_enabled_in_os() -> bool {
             .map(|disable_ipv6| disable_ipv6.trim() == "0")
             .unwrap_or(false)
     }
-    #[cfg(any(target_os = "macos", target_os = "freebsd", target_os = "android", target_os = "ios"))]
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "android",
+        target_os = "ios"
+    ))]
     {
         true
     }

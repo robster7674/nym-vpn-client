@@ -38,7 +38,12 @@ pub struct ConnectedState {
     tunnel_monitor_event_receiver: TunnelMonitorEventReceiver,
     selected_gateways: SelectedGateways,
     #[cfg_attr(
-        not(any(target_os = "linux", target_os = "windows", target_os = "ios", target_os = "freebsd")),
+        not(any(
+            target_os = "linux",
+            target_os = "windows",
+            target_os = "ios",
+            target_os = "freebsd"
+        )),
         allow(unused)
     )]
     tunnel_interface: TunnelInterface,
@@ -200,7 +205,12 @@ impl ConnectedState {
     async fn set_dns(&self, shared_state: &mut SharedState) -> Result<()> {
         let dns_config = shared_state.tunnel_settings.resolver_config();
 
-        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "ios", target_os = "freebsd"))]
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "windows",
+            target_os = "ios",
+            target_os = "freebsd"
+        ))]
         let tunnel_metadata = self.tunnel_interface.exit_tunnel_metadata();
 
         tracing::debug!("Enabling local DNS forwarder to: {dns_config}");

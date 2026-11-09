@@ -24,16 +24,13 @@ use nym_firewall_config::{ALLOWED_LAN_MULTICAST_NETS, ALLOWED_LAN_NETS};
 
 use super::{
     FirewallArguments, FirewallPolicy,
-    net::{
-        AllowedEndpoint, AllowedTunnelTraffic, Endpoint, TransportProtocol, TunnelInterface,
-    },
+    net::{AllowedEndpoint, AllowedTunnelTraffic, Endpoint, TransportProtocol, TunnelInterface},
 };
 
 const ANCHOR_NAME: &str = "nym";
 const PFCTL: &str = "/sbin/pfctl";
 const KLDLOAD: &str = "/sbin/kldload";
 const PF_CONF: &str = "/etc/pf.conf";
-
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -503,9 +500,9 @@ mod tests {
             allow_lan: false,
             allowed_endpoints: vec![peer()],
         });
-        assert!(rules.contains(
-            "pass out quick proto udp to 203.0.113.7 port 51820 keep state user 0"
-        ));
+        assert!(
+            rules.contains("pass out quick proto udp to 203.0.113.7 port 51820 keep state user 0")
+        );
         assert!(!rules.contains("10.0.0.0/8"));
         assert!(rules.ends_with("block return out quick all\nblock drop quick all\n"));
     }
@@ -518,10 +515,17 @@ mod tests {
             allow_lan: true,
             dns_config: AllowedDns::new(vec![], vec![]),
         });
-        let block_dns = rules.find("block return out quick proto udp to port 53").unwrap();
-        let allow_tunnel = rules.find("pass quick on tun0 flags S/SA keep state").unwrap();
+        let block_dns = rules
+            .find("block return out quick proto udp to port 53")
+            .unwrap();
+        let allow_tunnel = rules
+            .find("pass quick on tun0 flags S/SA keep state")
+            .unwrap();
         let allow_lan = rules.find("pass out quick from any to 10.0.0.0/8").unwrap();
-        assert!(block_dns < allow_lan, "DNS must be blocked before the LAN is allowed");
+        assert!(
+            block_dns < allow_lan,
+            "DNS must be blocked before the LAN is allowed"
+        );
         assert!(block_dns < allow_tunnel);
     }
 
@@ -537,9 +541,11 @@ mod tests {
             allowed_entry_tunnel_traffic: AllowedTunnelTraffic::None,
             allowed_exit_tunnel_traffic: AllowedTunnelTraffic::One(endpoint),
         });
-        assert!(rules.contains(
-            "pass quick on tun0 proto tcp to 10.1.0.1 port 8080 flags S/SA keep state"
-        ));
+        assert!(
+            rules.contains(
+                "pass quick on tun0 proto tcp to 10.1.0.1 port 8080 flags S/SA keep state"
+            )
+        );
         assert!(!rules.contains("pass quick on tun0 flags"));
     }
 
@@ -623,12 +629,20 @@ mod tests {
         assert!(is_enabled().unwrap());
         let anchor_rules = pfctl(&["-a", ANCHOR_NAME, "-s", "rules"]).unwrap();
         assert!(anchor_rules.contains("203.0.113.7"), "{anchor_rules}");
-        assert!(anchor_rules.contains("block drop quick all"), "{anchor_rules}");
+        assert!(
+            anchor_rules.contains("block drop quick all"),
+            "{anchor_rules}"
+        );
         assert!(pfctl(&["-s", "rules"]).unwrap().contains("anchor \"nym\""));
 
         firewall.0.reset_policy().unwrap();
 
         assert_eq!(is_enabled().unwrap(), was_enabled);
-        assert!(pfctl(&["-a", ANCHOR_NAME, "-s", "rules"]).unwrap().trim().is_empty());
+        assert!(
+            pfctl(&["-a", ANCHOR_NAME, "-s", "rules"])
+                .unwrap()
+                .trim()
+                .is_empty()
+        );
     }
 }

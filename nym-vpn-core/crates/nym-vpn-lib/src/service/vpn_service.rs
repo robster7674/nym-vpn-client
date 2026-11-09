@@ -254,7 +254,12 @@ pub enum VpnServiceCommand {
         oneshot::Sender<Result<RecentGateways, ListGatewaysError>>,
         TunnelType,
     ),
-    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows", target_os = "freebsd"))]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows",
+        target_os = "freebsd"
+    ))]
     IsSplitTunnelSupported(oneshot::Sender<bool>, ()),
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     SetEnableSplitTunnel(oneshot::Sender<()>, bool),
@@ -1342,7 +1347,12 @@ impl NymVpnService {
             VpnServiceCommand::GetTentativeGateways(tx, _) => {
                 let _ = tx.send(self.handle_get_tentative_gateways().await);
             }
-            #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows", target_os = "freebsd"))]
+            #[cfg(any(
+                target_os = "linux",
+                target_os = "macos",
+                target_os = "windows",
+                target_os = "freebsd"
+            ))]
             VpnServiceCommand::IsSplitTunnelSupported(tx, ()) => {
                 let is_available = self.handle_is_split_tunnel_supported().await;
                 let _ = tx.send(is_available);
