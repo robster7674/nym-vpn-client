@@ -12,11 +12,11 @@
 //! Platform-specific responsibilities (binding sockets, adding loopback aliases, flushing system
 //! DNS caches) are delegated to `platform`.
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "freebsd"))]
 mod unix;
 
 use nym_common::trace_err_chain;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "freebsd"))]
 pub(crate) use unix::flush_system_cache;
 
 #[cfg(windows)]

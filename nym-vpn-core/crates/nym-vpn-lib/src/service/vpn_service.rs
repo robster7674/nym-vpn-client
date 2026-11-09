@@ -45,7 +45,7 @@ use nym_vpn_lib_types::ErrorStateReason;
 use nym_vpn_lib_types::SplitApp;
 #[cfg(target_os = "linux")]
 use nym_vpn_lib_types::SplitTunnelExcludedProcess;
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 use nym_vpn_lib_types::SplitTunnelExcludedProcessList;
 use nym_vpn_lib_types::{
     AccountBalanceResponse, AccountCommandError, AccountControllerState, AppCompatibility,
@@ -254,7 +254,7 @@ pub enum VpnServiceCommand {
         oneshot::Sender<Result<RecentGateways, ListGatewaysError>>,
         TunnelType,
     ),
-    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows", target_os = "freebsd"))]
     IsSplitTunnelSupported(oneshot::Sender<bool>, ()),
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     SetEnableSplitTunnel(oneshot::Sender<()>, bool),
@@ -264,7 +264,7 @@ pub enum VpnServiceCommand {
     RemoveSplitTunnelApp(oneshot::Sender<()>, SplitApp),
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     ClearSplitTunnelApps(oneshot::Sender<()>, ()),
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
     GetSplitTunnelExcludedProcesses(oneshot::Sender<SplitTunnelExcludedProcessList>, ()),
     #[cfg(target_os = "linux")]
     AddSplitTunnelProcess(oneshot::Sender<()>, i32),
@@ -1342,7 +1342,7 @@ impl NymVpnService {
             VpnServiceCommand::GetTentativeGateways(tx, _) => {
                 let _ = tx.send(self.handle_get_tentative_gateways().await);
             }
-            #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+            #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows", target_os = "freebsd"))]
             VpnServiceCommand::IsSplitTunnelSupported(tx, ()) => {
                 let is_available = self.handle_is_split_tunnel_supported().await;
                 let _ = tx.send(is_available);
@@ -1367,7 +1367,7 @@ impl NymVpnService {
                 self.handle_clear_split_tunnel_apps().await;
                 let _ = tx.send(());
             }
-            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
             VpnServiceCommand::GetSplitTunnelExcludedProcesses(tx, ()) => {
                 let excluded_processes = self.handle_get_split_tunnel_excluded_processes().await;
                 let _ = tx.send(excluded_processes);

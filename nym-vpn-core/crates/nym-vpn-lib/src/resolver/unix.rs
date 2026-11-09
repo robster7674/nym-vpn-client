@@ -11,7 +11,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use crate::resolver::{LoopbackAlias, random_loopback_ipv4};
 
 /// Loopback interface name.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 const LOOPBACK: &str = "lo0";
 #[cfg(target_os = "linux")]
 const LOOPBACK: &str = "lo";
@@ -59,6 +59,12 @@ async fn assign_loopback_alias(addr: IpAddr) -> io::Result<()> {
     nym_macos::net::add_alias(LOOPBACK, addr).await
 }
 
+#[cfg(target_os = "freebsd")]
+async fn assign_loopback_alias(addr: IpAddr) -> io::Result<()> {
+    // TODO: Replace with nym-ifconfig
+    run_ifconfig(&[LOOPBACK, "inet", &format!("{addr}/32"), "alias"]).await
+}
+
 #[cfg(target_os = "linux")]
 async fn assign_loopback_alias(addr: IpAddr) -> io::Result<()> {
     // Add as /32: the 127.0.0.0/8 route typically already exists on `lo`.
@@ -81,6 +87,29 @@ async fn assign_loopback_alias(addr: IpAddr) -> io::Result<()> {
 #[cfg(target_os = "macos")]
 async fn remove_loopback_alias(addr: IpAddr) -> io::Result<()> {
     nym_macos::net::remove_alias(LOOPBACK, addr).await
+}
+
+#[cfg(target_os = "freebsd")]
+async fn remove_loopback_alias(addr: IpAddr) -> io::Result<()> {
+    // TODO: Replace with nym-ifconfig
+    run_ifconfig(&[LOOPBACK, "inet", &format!("{addr}/32"), "-alias"]).await
+}
+
+#[cfg(target_os = "freebsd")]
+// TODO: Replace with nym-ifconfig
+async fn run_ifconfig(args: &[&str]) -> io::Result<()> {
+    let output = tokio::process::Command::new("/sbin/ifconfig")
+        .args(args)
+        .output()
+        .await?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(io::Error::other(format!(
+        "ifconfig {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stderr).trim()
+    )))
 }
 
 #[cfg(target_os = "linux")]
@@ -135,8 +164,9 @@ impl LoopbackAlias for RandomLoopbackAlias {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "freebsd"))]
 pub async fn flush_system_cache() {
+    // FreeBSD has no system-wide DNS cache to flush.
     #[cfg(target_os = "macos")]
     {
         if let Err(error) = kill_mdnsresponder() {

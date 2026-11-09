@@ -26,7 +26,8 @@ use crate::tunnel_state_machine::{
     target_os = "linux",
     target_os = "macos",
     target_os = "windows",
-    target_os = "ios"
+    target_os = "ios",
+    target_os = "freebsd"
 ))]
 use nym_common::trace_err_chain;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -298,7 +299,7 @@ impl BlockedPolicyParameters {
             .map(|addr| {
                 AllowedEndpoint::new(
                     Endpoint::from_socket_address(*addr, TransportProtocol::Tcp),
-                    #[cfg(any(target_os = "linux", target_os = "macos"))]
+                    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
                     AllowedClients::Root,
                     #[cfg(target_os = "windows")]
                     AllowedClients::current_exe(),

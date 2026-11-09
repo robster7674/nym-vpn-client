@@ -14,7 +14,7 @@ mod ipv6_availability;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod route_handler;
 mod states;
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 mod tun_ipv6;
 #[cfg(any(target_os = "ios", target_os = "android"))]
 mod tun_name;

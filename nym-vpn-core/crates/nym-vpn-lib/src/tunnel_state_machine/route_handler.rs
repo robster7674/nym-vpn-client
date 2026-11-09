@@ -265,7 +265,7 @@ impl RouteHandler {
             route = route.use_main_table(false);
         }
 
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
         {
             route = route.mtu(_mtu);
         }
@@ -282,7 +282,7 @@ impl RouteHandler {
             route = route.use_main_table(false);
         }
 
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
         {
             route = route.mtu(_mtu);
         }
@@ -313,7 +313,7 @@ impl RouteHandler {
                 .collect();
         }
 
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
         {
             routes = routes.into_iter().map(|r| r.mtu(_mtu)).collect();
         }

@@ -51,7 +51,11 @@ pub enum AuthenticationError {
     #[error("process is shutting down")]
     ShuttingDown,
 
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[cfg(target_os = "freebsd")]
+    #[error("failed to get the credentials of the connected client")]
+    PeerCredentials(#[source] std::io::Error),
+
+    #[cfg(any(target_os = "linux", target_os = "windows", target_os = "freebsd"))]
     #[error("authorization denied")]
     AuthorizationDenied,
 }

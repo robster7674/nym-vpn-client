@@ -60,7 +60,7 @@ use nym_vpn_lib_types::{
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use super::route_handler::{RouteHandler, RoutingConfig};
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 use super::tun_ipv6;
 #[cfg(any(target_os = "ios", target_os = "android"))]
 use super::tun_name;
@@ -1359,7 +1359,7 @@ impl TunnelMonitor {
         Ok((bridge_addr, join_handle))
     }
 
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
     async fn start_wireguard_netstack_tunnel(
         &mut self,
         connected_tunnel: ConnectedTunnel,
@@ -1538,7 +1538,7 @@ impl TunnelMonitor {
         })
     }
 
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
     async fn start_wireguard_tunnel(
         &mut self,
         connected_tunnel: ConnectedTunnel,
@@ -1924,7 +1924,7 @@ impl TunnelMonitor {
             tun::create_as_async(&tun_config).map_err(Error::CreateTunDevice)?
         };
 
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
         if let Some(interface_ipv6) = interface_ipv6 {
             let tun_name = tun_device
                 .deref()
@@ -1956,7 +1956,7 @@ impl TunnelMonitor {
         Ok(tun_device)
     }
 
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
     fn create_wireguard_device(
         interface_ipv4: Ipv4Addr,
         interface_ipv6: Option<Ipv6Addr>,

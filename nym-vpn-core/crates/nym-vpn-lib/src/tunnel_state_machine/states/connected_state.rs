@@ -491,7 +491,7 @@ impl ConnectedPolicyParameters {
                     #[cfg(target_os = "linux")]
                     // On Linux, All is needed so the mangle chain rule sets fwmark for outbound traffic
                     AllowedClients::All,
-                    #[cfg(target_os = "macos")]
+                    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
                     AllowedClients::Root,
                     #[cfg(target_os = "windows")]
                     AllowedClients::current_exe(),
@@ -507,7 +507,7 @@ impl ConnectedPolicyParameters {
                     #[cfg(target_os = "linux")]
                     // On Linux, All is needed so the mangle chain rule sets fwmark for outbound traffic
                     AllowedClients::All,
-                    #[cfg(target_os = "macos")]
+                    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
                     AllowedClients::Root,
                     #[cfg(target_os = "windows")]
                     AllowedClients::current_exe(),

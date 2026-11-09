@@ -8,7 +8,7 @@ use tokio::net::UdpSocket;
 
 #[cfg(not(target_os = "ios"))]
 use crate::resolver::LoopbackAlias;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "freebsd"))]
 use crate::resolver::unix::RandomLoopbackAlias;
 #[cfg(windows)]
 use crate::resolver::windows::RandomLoopbackAlias;
