@@ -110,3 +110,38 @@ impl super::DnsMonitorT for DnsMonitor {
         result
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::DnsMonitorT;
+
+    /// Registers DNS servers with resolvconf, requires root.
+    #[tokio::test]
+    #[ignore = "changes /etc/resolv.conf, requires root"]
+    async fn sets_and_resets_dns() {
+        let before = std::fs::read_to_string("/etc/resolv.conf").unwrap();
+
+        let mut monitor = DnsMonitor::new().unwrap();
+        monitor
+            .set(
+                "tun9",
+                DnsConfig {
+                    addresses: vec!["127.1.2.3".parse().unwrap()],
+                    port: 53,
+                },
+            )
+            .await
+            .unwrap();
+
+        let during = std::fs::read_to_string("/etc/resolv.conf").unwrap();
+        assert!(during.contains("nameserver 127.1.2.3"), "{during}");
+        // The record is exclusive, so the servers of other interfaces are not used.
+        assert_eq!(during.matches("nameserver").count(), 1, "{during}");
+
+        monitor.reset().await.unwrap();
+
+        let after = std::fs::read_to_string("/etc/resolv.conf").unwrap();
+        assert_eq!(after, before);
+    }
+}

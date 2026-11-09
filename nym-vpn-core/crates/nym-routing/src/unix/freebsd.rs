@@ -438,4 +438,65 @@ mod tests {
         push_destination(&mut args, &"2001:db8::/32".parse().unwrap());
         assert_eq!(args, ["-net", "2001:db8::/32"]);
     }
+
+    fn route_get(destination: &str) -> String {
+        let output = std::process::Command::new(ROUTE_BINARY)
+            .args(["-n", "get", destination])
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&output.stdout).into_owned()
+    }
+
+    /// Adds routes to the system routing table, requires root.
+    #[tokio::test]
+    #[ignore = "changes the routing table of the machine, requires root"]
+    async fn adds_and_removes_routes() {
+        use crate::{Node, RouteManagerHandle};
+
+        let ifconfig = |args: &[&str]| {
+            assert!(
+                std::process::Command::new("/sbin/ifconfig")
+                    .args(args)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        };
+        ifconfig(&["tun9", "create"]);
+        ifconfig(&["tun9", "inet", "10.9.9.1", "10.9.9.2", "up"]);
+
+        let default_route = get_default_route(AddressFamily::Ipv4)
+            .await
+            .expect("the test needs a default route");
+
+        let manager = RouteManagerHandle::spawn().await.unwrap();
+        let routes = HashSet::from([
+            // Through a node on the tunnel.
+            RequiredRoute::new(
+                "198.51.100.0/24".parse().unwrap(),
+                Node::new("10.9.9.2".parse().unwrap(), "tun9".to_owned()),
+            ),
+            // Through the current default route, and with an MTU.
+            RequiredRoute::new("203.0.113.5/32".parse().unwrap(), NetNode::DefaultNode).mtu(1400),
+        ]);
+        manager.add_routes(routes).await.unwrap();
+
+        let tunnel_route = route_get("198.51.100.7");
+        assert!(tunnel_route.contains("interface: tun9"), "{tunnel_route}");
+        let default_node_route = route_get("203.0.113.5");
+        assert!(
+            default_node_route.contains(&format!("interface: {}", default_route.interface)),
+            "{default_node_route}"
+        );
+        assert!(default_node_route.contains("1400"), "{default_node_route}");
+
+        manager.clear_routes().unwrap();
+        manager.stop().await;
+
+        let cleared = route_get("198.51.100.7");
+        assert!(!cleared.contains("interface: tun9"), "{cleared}");
+        assert!(!route_get("203.0.113.5").contains("1400"));
+
+        ifconfig(&["tun9", "destroy"]);
+    }
 }
