@@ -438,39 +438,40 @@ fn allow_dhcp_client(rules: &mut String) {
 
 fn allow_ndp(rules: &mut String) {
     let link_local = IpNetwork::V6(super::IPV6_LINK_LOCAL);
+    // pf expects the ICMPv6 type after the addresses.
     let _ = writeln!(
         rules,
-        "pass out quick inet6 proto icmp6 icmp6-type routersol to {}",
+        "pass out quick inet6 proto icmp6 from any to {} icmp6-type routersol",
         super::ROUTER_SOLICITATION_OUT_DST_ADDR
     );
     let _ = writeln!(
         rules,
-        "pass in quick inet6 proto icmp6 icmp6-type routeradv from {link_local}"
+        "pass in quick inet6 proto icmp6 from {link_local} to any icmp6-type routeradv"
     );
     let _ = writeln!(
         rules,
-        "pass in quick inet6 proto icmp6 icmp6-type redir from {link_local}"
+        "pass in quick inet6 proto icmp6 from {link_local} to any icmp6-type redir"
     );
     let _ = writeln!(
         rules,
-        "pass out quick inet6 proto icmp6 icmp6-type neighbrsol to {}",
+        "pass out quick inet6 proto icmp6 from any to {} icmp6-type neighbrsol",
         super::SOLICITED_NODE_MULTICAST
     );
     let _ = writeln!(
         rules,
-        "pass out quick inet6 proto icmp6 icmp6-type neighbrsol to {link_local}"
+        "pass out quick inet6 proto icmp6 from any to {link_local} icmp6-type neighbrsol"
     );
     let _ = writeln!(
         rules,
-        "pass in quick inet6 proto icmp6 icmp6-type neighbrsol from {link_local}"
+        "pass in quick inet6 proto icmp6 from {link_local} to any icmp6-type neighbrsol"
     );
     let _ = writeln!(
         rules,
-        "pass out quick inet6 proto icmp6 icmp6-type neighbradv to {link_local}"
+        "pass out quick inet6 proto icmp6 from any to {link_local} icmp6-type neighbradv"
     );
     let _ = writeln!(
         rules,
-        "pass in quick inet6 proto icmp6 icmp6-type neighbradv"
+        "pass in quick inet6 proto icmp6 from any to any icmp6-type neighbradv"
     );
 }
 
