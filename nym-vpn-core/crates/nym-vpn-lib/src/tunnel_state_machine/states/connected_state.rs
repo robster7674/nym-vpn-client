@@ -4,7 +4,7 @@
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use std::net::SocketAddr;
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "freebsd"))]
 use nym_dns::DnsConfig;
 
 use nym_vpn_lib_types::ErrorStateReason;
@@ -38,7 +38,7 @@ pub struct ConnectedState {
     tunnel_monitor_event_receiver: TunnelMonitorEventReceiver,
     selected_gateways: SelectedGateways,
     #[cfg_attr(
-        not(any(target_os = "linux", target_os = "windows", target_os = "ios")),
+        not(any(target_os = "linux", target_os = "windows", target_os = "ios", target_os = "freebsd")),
         allow(unused)
     )]
     tunnel_interface: TunnelInterface,
@@ -200,7 +200,7 @@ impl ConnectedState {
     async fn set_dns(&self, shared_state: &mut SharedState) -> Result<()> {
         let dns_config = shared_state.tunnel_settings.resolver_config();
 
-        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "ios"))]
+        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "ios", target_os = "freebsd"))]
         let tunnel_metadata = self.tunnel_interface.exit_tunnel_metadata();
 
         tracing::debug!("Enabling local DNS forwarder to: {dns_config}");
@@ -216,7 +216,7 @@ impl ConnectedState {
             .inspect_err(|err| trace_err_chain!(err, "failed to enable dns forwarding"))
             .map_err(Error::SetLocalDnsResolverConfig)?;
 
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "freebsd"))]
         {
             // Point the tunnel interface DNS at the local filtering resolver so that the OS actually
             // sends DNS queries to it.
@@ -241,7 +241,7 @@ impl ConnectedState {
             trace_err_chain!(err, "failed to disable dns forwarding");
         }
 
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "freebsd"))]
         if let Err(error) = shared_state
             .dns_handler
             .reset_before_interface_removal()

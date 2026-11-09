@@ -228,7 +228,7 @@ impl TunnelStateHandler for OfflineState {
                 if connectivity.is_offline() {
                     NextTunnelState::SameState(self)
                 } else {
-                    #[cfg(any(target_os = "linux", target_os = "windows"))]
+                    #[cfg(any(target_os = "linux", target_os = "windows", target_os = "freebsd"))]
                     Self::reset_dns(shared_state).await;
 
                     if self.reconnect {

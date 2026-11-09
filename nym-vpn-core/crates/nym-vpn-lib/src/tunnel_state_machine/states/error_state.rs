@@ -203,7 +203,7 @@ impl TunnelStateHandler for ErrorState {
                 tracing::debug!("ErrorState received command: {command:?}");
                 match command {
                     TunnelCommand::Connect => {
-                        #[cfg(any(target_os = "linux", target_os = "windows"))]
+                        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "freebsd"))]
                         Self::reset_dns(shared_state).await;
 
                         if shared_state.connectivity_handle.connectivity().await.is_offline() {

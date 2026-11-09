@@ -34,8 +34,6 @@ const PFCTL: &str = "/sbin/pfctl";
 const KLDLOAD: &str = "/sbin/kldload";
 const PF_CONF: &str = "/etc/pf.conf";
 
-/// Restricts a rule to processes of the root user.
-const ROOT_USER: &str = "user 0";
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -176,6 +174,11 @@ fn check_output(args: &[&str], output: std::process::Output) -> Result<String> {
     }
 }
 
+/// Restricts a rule to processes of the root user.
+fn root_user() -> String {
+    format!("user {}", super::ROOT_UID)
+}
+
 fn proto(protocol: TransportProtocol) -> &'static str {
     match protocol {
         TransportProtocol::Udp => "udp",
@@ -220,10 +223,11 @@ fn generate_rules(policy: &FirewallPolicy) -> String {
                 // Only root may use the non-tunnel DNS servers while connecting.
                 let _ = writeln!(
                     rules,
-                    "pass out quick proto {} {} {} {ROOT_USER}",
+                    "pass out quick proto {} {} {} {}",
                     proto(dns.protocol),
                     to_endpoint(dns),
                     state_options(Some(dns.protocol)),
+                    root_user(),
                 );
             }
             for endpoint in peer_endpoints.iter().chain(allowed_endpoints) {
@@ -335,9 +339,9 @@ fn generate_rules(policy: &FirewallPolicy) -> String {
 /// Allow traffic to an endpoint, for the root user only unless all clients are allowed.
 fn allow_endpoint(rules: &mut String, endpoint: &AllowedEndpoint) {
     let user = if endpoint.clients.allow_all() {
-        ""
+        String::new()
     } else {
-        ROOT_USER
+        root_user()
     };
     let _ = writeln!(
         rules,
