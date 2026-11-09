@@ -1,0 +1,39 @@
+# Throwaway workflow on a fork-only branch: checks that the FreeBSD port did not break other platforms.
+name: freebsd-port-check
+
+on:
+  push:
+    branches: [ci-freebsd-port-check]
+  workflow_dispatch:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libdbus-1-dev libmnl-dev libnftnl-dev libnm-dev pkg-config
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install protobuf
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install protoc -y
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install 1.97 --profile minimal --component clippy
+          rustup default 1.97
+          rustc --version
+
+      - name: cargo check
+        working-directory: nym-vpn-core
+        run: cargo check -p nym-vpnd -p nym-vpnc -p nym-socks5-proxy -p nym-routing -p nym-firewall -p nym-dns -p nym-offline-monitor -p nym-ipc -p nym-platform-metadata -p nym-vpn-lib --all-targets
