@@ -40,7 +40,7 @@ const NYM_CERTIFICATE_SERIAL_NUMBER: &str = "4ec9356d8c87f9cf3ccf60e7bdad022f";
 const CLIENT_SIGNING_REQUIREMENT: &str = r#"anchor apple generic and certificate leaf[subject.OU] = "VW5DZLFHM5" and (identifier "net.nymtech.vpn" or identifier "net.nymtech.vpn.cli")"#;
 #[cfg(target_os = "macos")]
 const DAEMON_SIGNING_REQUIREMENT: &str = r#"anchor apple generic and certificate leaf[subject.OU] = "VW5DZLFHM5" and identifier "net.nymtech.vpn.daemon""#;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 const NYM_VPN_GROUP_NAME: &str = "nym-vpn";
 
 pub struct CommandInterface {
@@ -1283,7 +1283,12 @@ impl NymVpnService for CommandInterface {
         &self,
         _request: tonic::Request<()>,
     ) -> Result<tonic::Response<bool>> {
-        #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+        #[cfg(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "freebsd"
+        ))]
         {
             let is_available = self
                 .send_and_wait(
@@ -1294,7 +1299,12 @@ impl NymVpnService for CommandInterface {
             Ok(tonic::Response::new(is_available))
         }
 
-        #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+        #[cfg(not(any(
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "freebsd"
+        )))]
         Err(tonic::Status::internal("Unsupported platform"))
     }
 
@@ -1480,7 +1490,7 @@ pub async fn start_command_interface(
                 daemon_req: DAEMON_SIGNING_REQUIREMENT.to_string(),
                 client_req: CLIENT_SIGNING_REQUIREMENT.to_string(),
             },
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             NYM_VPN_GROUP_NAME,
             #[cfg(unix)]
             shutdown_token.child_token(),
@@ -1495,11 +1505,11 @@ pub async fn start_command_interface(
             let server = Server::builder().add_service(NymVpnServiceServer::new(command_interface));
             // Linux needs to handle the shutdown internally first, as it spawns an authentication prompt that needs to
             // be closed in case of shutdown, so the stream can't be shutdown by tonic before that happens...
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             let ret = server.serve_with_incoming(incoming).await;
             // ... but non-Linux desktops do authentication by signature verification, which can be stopped at any moment,
             // so we serve it by attaching the shutdown token to tonic directly
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
             let ret = server
                 .serve_with_incoming_shutdown(
                     incoming,
