@@ -26,7 +26,6 @@ load_rc_config $name
 
 pidfile="/var/run/${name}.pid"
 command="/usr/sbin/daemon"
-procname="/usr/local/bin/nym-vpnd"
 command_args="-r -R 2 -P ${pidfile} -t ${name} /usr/local/bin/nym-vpnd ${nym_vpnd_flags} run-as-service"
 
 # nym-vpnd needs the pf kernel module for the firewall (kill switch).
