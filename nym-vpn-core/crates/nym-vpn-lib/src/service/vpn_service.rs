@@ -254,7 +254,12 @@ pub enum VpnServiceCommand {
         oneshot::Sender<Result<RecentGateways, ListGatewaysError>>,
         TunnelType,
     ),
-    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "windows",
+        target_os = "freebsd"
+    ))]
     IsSplitTunnelSupported(oneshot::Sender<bool>, ()),
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     SetEnableSplitTunnel(oneshot::Sender<()>, bool),
@@ -1342,7 +1347,12 @@ impl NymVpnService {
             VpnServiceCommand::GetTentativeGateways(tx, _) => {
                 let _ = tx.send(self.handle_get_tentative_gateways().await);
             }
-            #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+            #[cfg(any(
+                target_os = "linux",
+                target_os = "macos",
+                target_os = "windows",
+                target_os = "freebsd"
+            ))]
             VpnServiceCommand::IsSplitTunnelSupported(tx, ()) => {
                 let is_available = self.handle_is_split_tunnel_supported().await;
                 let _ = tx.send(is_available);
@@ -2513,7 +2523,13 @@ impl NymVpnService {
             self.split_tunnel_pid_manager.is_supported()
         }
 
-        #[cfg(not(target_os = "linux"))]
+        // Split tunnelling is not implemented on FreeBSD.
+        #[cfg(target_os = "freebsd")]
+        {
+            false
+        }
+
+        #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         {
             true
         }

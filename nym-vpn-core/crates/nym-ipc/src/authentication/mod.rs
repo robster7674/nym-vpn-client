@@ -5,8 +5,13 @@
 mod linux;
 #[cfg(target_os = "linux")]
 pub(crate) use linux::{Transport, incoming, is_authenticated};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use nix::unistd::{Gid, Group};
+
+#[cfg(target_os = "freebsd")]
+mod freebsd;
+#[cfg(target_os = "freebsd")]
+pub(crate) use freebsd::{Transport, incoming, is_authenticated};
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -43,7 +48,7 @@ pub(crate) async fn deny(stream: impl AsyncWrite + Unpin) {
 pub struct AuthenticationLayer<T> {
     listener: T,
     auth_material: Option<AuthenticationMaterial>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     shutdown_token: tokio_util::sync::CancellationToken,
 }
 
@@ -51,12 +56,13 @@ impl<T> AuthenticationLayer<T> {
     fn new(
         listener: T,
         auth_material: Option<AuthenticationMaterial>,
-        #[cfg(target_os = "linux")] shutdown_token: tokio_util::sync::CancellationToken,
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+        shutdown_token: tokio_util::sync::CancellationToken,
     ) -> Self {
         Self {
             listener,
             auth_material,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             shutdown_token,
         }
     }
@@ -70,7 +76,7 @@ pub struct AuthenticationMaterial {
     pub(crate) nym_certificate_serial_number: String,
     #[cfg(target_os = "macos")]
     pub(crate) signing_requirements: SigningRequirements,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub(crate) nym_vpn_gid: Option<Gid>,
     #[cfg(unix)]
     pub(crate) shutdown_token: tokio_util::sync::CancellationToken,
@@ -81,10 +87,10 @@ impl AuthenticationMaterial {
         disable_client_verification: bool,
         #[cfg(target_os = "windows")] nym_certificate_serial_number: String,
         #[cfg(target_os = "macos")] signing_requirements: SigningRequirements,
-        #[cfg(target_os = "linux")] nym_vpn_group: &str,
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))] nym_vpn_group: &str,
         #[cfg(unix)] shutdown_token: tokio_util::sync::CancellationToken,
     ) -> Self {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         let nym_vpn_gid = Group::from_name(nym_vpn_group)
             .inspect_err(|err| tracing::warn!("Could not get the group {nym_vpn_group}: {err}"))
             .inspect(|g| {
@@ -102,7 +108,7 @@ impl AuthenticationMaterial {
             nym_certificate_serial_number,
             #[cfg(target_os = "macos")]
             signing_requirements,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             nym_vpn_gid,
             #[cfg(unix)]
             shutdown_token,
@@ -145,9 +151,9 @@ impl<T: Unpin + Stream<Item = Result<Transport>>> AuthenticationLayer<T> {
     fn stream(mut self) -> impl Stream<Item = Result<Transport>> {
         try_stream! {
             loop {
-                #[cfg(not(target_os = "linux"))]
+                #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
                 let shutdown_signal = std::future::pending::<()>();
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                 let shutdown_signal = self.shutdown_token.cancelled();
 
                 let next_stream = tokio::select! {

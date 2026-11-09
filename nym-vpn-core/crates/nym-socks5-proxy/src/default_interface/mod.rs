@@ -57,7 +57,7 @@ pub async fn start_monitor(shutdown_token: CancellationToken) -> watch::Receiver
     #[cfg(target_os = "macos")]
     return macos::start_monitor(shutdown_token).await;
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
     {
         let _ = shutdown_token;
         let (_, rx) = watch::channel(DefaultInterface::default());

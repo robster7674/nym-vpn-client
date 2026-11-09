@@ -25,7 +25,7 @@ pub async fn create_incoming(
             crate::xpc::incoming(auth_material)
         }
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
         crate::uds::incoming(socket_path, auth_material).await
     }

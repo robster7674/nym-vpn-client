@@ -26,6 +26,10 @@ mod imp;
 #[path = "linux.rs"]
 mod imp;
 
+#[cfg(target_os = "freebsd")]
+#[path = "freebsd.rs"]
+mod imp;
+
 #[cfg(target_os = "android")]
 #[path = "android.rs"]
 mod imp;

@@ -15,6 +15,10 @@ mod imp;
 #[path = "linux/mod.rs"]
 mod imp;
 
+#[cfg(target_os = "freebsd")]
+#[path = "freebsd.rs"]
+mod imp;
+
 #[cfg(windows)]
 #[path = "windows/mod.rs"]
 mod imp;

@@ -34,6 +34,7 @@ pub async fn connect(
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "freebsd",
     all(target_os = "macos", debug_assertions, not(feature = "xpc"))
 ))]
 pub async fn connect(socket_path: std::path::PathBuf) -> Result<TokioIo<tokio::net::UnixStream>> {

@@ -1,7 +1,12 @@
 // Copyright 2025 - Nym Technologies SA <contact@nymtech.net>
 // SPDX-License-Identifier: GPL-3.0-only
 
-#![cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+#![cfg(any(
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "freebsd"
+))]
 
 mod auth_result;
 pub mod client;
@@ -21,6 +26,7 @@ pub use authentication::SigningRequirements;
 
 #[cfg(any(
     target_os = "linux",
+    target_os = "freebsd",
     all(target_os = "macos", debug_assertions, not(feature = "xpc"))
 ))]
 #[cfg(feature = "daemon")]

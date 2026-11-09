@@ -31,6 +31,9 @@ pub use imp::get_default_route_interfaces;
 #[cfg(target_os = "macos")]
 pub use imp::{DefaultRouteEvent, InterfaceEvent, PlatformError, imp::RouteError};
 
+#[cfg(target_os = "freebsd")]
+pub use imp::{DefaultRoute, DefaultRouteEvent, PlatformError};
+
 pub use imp::{Error, RouteManagerHandle};
 
 use std::{fmt, net::IpAddr};
@@ -122,7 +125,7 @@ pub struct Route {
     metric: Option<u32>,
     #[cfg(target_os = "linux")]
     table_id: u32,
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
     mtu: Option<u32>,
 }
 
@@ -135,7 +138,7 @@ impl Route {
             metric: None,
             #[cfg(target_os = "linux")]
             table_id: u32::from(RouteHeader::RT_TABLE_MAIN),
-            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
             mtu: None,
         }
     }
@@ -180,7 +183,7 @@ pub struct RequiredRoute {
     #[cfg(target_os = "linux")]
     main_table: bool,
     /// Specifies route MTU
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
     mtu: Option<u16>,
 }
 
@@ -192,7 +195,7 @@ impl RequiredRoute {
             prefix,
             #[cfg(target_os = "linux")]
             main_table: true,
-            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
             mtu: None,
         }
     }
@@ -205,7 +208,7 @@ impl RequiredRoute {
     }
 
     /// Set route MTU to the given value.
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
     pub fn mtu(mut self, mtu: u16) -> Self {
         self.mtu = Some(mtu);
         self

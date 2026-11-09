@@ -31,6 +31,9 @@ nym-common.workspace = true
 libc.workspace = true
 rtnetlink.workspace = true
 
+[target.'cfg(target_os = "freebsd")'.dependencies]
+libc.workspace = true
+
 [target.'cfg(target_os = "macos")'.dependencies]
 bitflags.workspace = true
 libc.workspace = true
