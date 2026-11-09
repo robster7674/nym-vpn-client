@@ -11,8 +11,8 @@ export PATH=/usr/local/go127/bin:$PATH
 cd nym-vpn-core && cargo build --release -p nym-vpnd -p nym-vpnc
 ```
 
-`wireguard-go` needs `-buildmode=c-archive`, which Go does not support on FreeBSD/arm64, so the
-daemon can only be linked on amd64 for now.
+`wireguard-go` needs `-buildmode=c-archive`. Go lists it for FreeBSD/amd64 only, so on arm64 the
+build script builds the Go tools from a patched copy of GOROOT (`libwg/goplatform-freebsd-arm64.diff`).
 
 ## Install
 
@@ -28,9 +28,11 @@ nym-vpnc status
 
 ## Notes
 
-- The kill switch uses pf. While a policy is active the daemon replaces the main pf ruleset with
-  one that only evaluates the `nym` anchor, and restores `/etc/pf.conf` (or disables pf) when the
-  policy is removed.
+- The kill switch uses pf. The rules go into the `nym` anchor. If `/etc/pf.conf` already has
+  `anchor "nym"` as its first filter rule, your own rules stay active and only the anchor is
+  changed. Without it, the daemon replaces the main ruleset with one that only evaluates the anchor
+  while a policy is active, and restores `/etc/pf.conf` (or disables pf) afterwards. Custom rules,
+  for example NAT, are suspended in that case.
 - DNS is set through `resolvconf(8)`.
 - Routes are managed with `route(8)`.
 - Split tunnelling is not supported.
