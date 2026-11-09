@@ -1,11 +1,11 @@
 // Copyright 2025 Nym Technologies SA <contact@nymtech.net>
 // SPDX-License-Identifier: GPL-3.0-only
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 use std::net::Ipv6Addr;
 use std::{borrow::Cow, fmt, net::IpAddr};
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 use ipnetwork::Ipv6Network;
 
 #[cfg(target_os = "linux")]
@@ -17,6 +17,10 @@ mod imp;
 
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
+mod imp;
+
+#[cfg(target_os = "freebsd")]
+#[path = "freebsd.rs"]
 mod imp;
 
 #[cfg(windows)]
@@ -41,18 +45,18 @@ pub use net::{
 
 pub use self::imp::Error;
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 const IPV6_LINK_LOCAL: Ipv6Network =
     Ipv6Network::new_checked(Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 0), 10).unwrap();
 /// The allowed target addresses of outbound DHCPv6 requests
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 const DHCPV6_SERVER_ADDRS: [Ipv6Addr; 2] = [
     Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 1, 2),
     Ipv6Addr::new(0xff05, 0, 0, 0, 0, 0, 1, 3),
 ];
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 const ROUTER_SOLICITATION_OUT_DST_ADDR: Ipv6Addr = Ipv6Addr::new(0xff02, 0, 0, 0, 0, 0, 0, 2);
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 const SOLICITED_NODE_MULTICAST: Ipv6Network =
     Ipv6Network::new_checked(Ipv6Addr::new(0xff02, 0, 0, 0, 0, 1, 0xFF00, 0), 104).unwrap();
 
