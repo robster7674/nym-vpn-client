@@ -541,4 +541,56 @@ mod tests {
         ));
         assert!(!rules.contains("pass quick on tun0 flags"));
     }
+
+    /// Check the generated rulesets with the pf parser, without loading them.
+    #[test]
+    #[ignore = "requires pfctl and the pf kernel module"]
+    fn generated_rules_parse_with_pfctl() {
+        let dns = Endpoint::new(Ipv4Addr::new(10, 0, 0, 1), 53, TransportProtocol::Udp);
+        let policies = [
+            FirewallPolicy::Blocked {
+                allow_lan: true,
+                allowed_endpoints: vec![peer()],
+            },
+            FirewallPolicy::Connecting {
+                peer_endpoints: vec![peer()],
+                tunnel: Some(tunnel()),
+                allow_lan: true,
+                dns_config: AllowedDns::new(vec![], vec![dns]),
+                allowed_endpoints: vec![peer()],
+                allowed_entry_tunnel_traffic: AllowedTunnelTraffic::None,
+                allowed_exit_tunnel_traffic: AllowedTunnelTraffic::All,
+            },
+            FirewallPolicy::Connected {
+                peer_endpoints: vec![peer()],
+                tunnel: tunnel(),
+                allow_lan: true,
+                dns_config: AllowedDns::new(
+                    vec![Endpoint::new(
+                        Ipv4Addr::new(10, 64, 0, 1),
+                        53,
+                        TransportProtocol::Udp,
+                    )],
+                    vec![dns],
+                ),
+            },
+        ];
+
+        for policy in policies {
+            let rules = generate_rules(&policy);
+            let mut child = Command::new(PFCTL)
+                .args(["-n", "-a", ANCHOR_NAME, "-f", "-"])
+                .stdin(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            std::io::Write::write_all(&mut child.stdin.take().unwrap(), rules.as_bytes()).unwrap();
+            let output = child.wait_with_output().unwrap();
+            assert!(
+                output.status.success(),
+                "pfctl rejected the rules of `{policy}`: {}\n{rules}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
 }
