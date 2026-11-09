@@ -1,0 +1,261 @@
+<title>NymVPN FreeBSD Port</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: one reading column, a status strip first, then findings, results and open items. */
+  :root {
+    --bg: #f6f5f3;
+    --surface: #ffffff;
+    --fg: #1d1b1a;
+    --muted: #615c58;
+    --line: #dcd8d3;
+    --accent: #a52a2a;
+    --accent-soft: #f3e2e0;
+    --ok: #1f7a46;
+    --ok-soft: #dcefe3;
+    --wait: #8a5a00;
+    --wait-soft: #f6e8c8;
+    --block: #a52a2a;
+    --block-soft: #f3e2e0;
+    --code-bg: #efece8;
+    --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161413; --surface: #201d1c; --fg: #ece8e4; --muted: #a39d97; --line: #38332f;
+      --accent: #e0726b; --accent-soft: #3a2220;
+      --ok: #62c28a; --ok-soft: #1b3326; --wait: #e3b04b; --wait-soft: #3a2f14;
+      --block: #e0726b; --block-soft: #3a2220; --code-bg: #2a2623;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161413; --surface: #201d1c; --fg: #ece8e4; --muted: #a39d97; --line: #38332f;
+    --accent: #e0726b; --accent-soft: #3a2220;
+    --ok: #62c28a; --ok-soft: #1b3326; --wait: #e3b04b; --wait-soft: #3a2f14;
+    --block: #e0726b; --block-soft: #3a2220; --code-bg: #2a2623;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 400 15px/1.6 var(--font-body);
+    padding-block: 32px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 1.25rem; font-weight: 700; padding-bottom: 8px; border-bottom: 2px solid var(--fg); }
+  h3 { font-size: 1rem; font-weight: 600; }
+  p { margin: 0; max-width: 68ch; }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+  .eyebrow { font: 600 0.72rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .lede { font-size: 1.1rem; color: var(--fg); max-width: 62ch; }
+  header { display: flex; flex-direction: column; gap: 12px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 20px; color: var(--muted); font-size: 0.85rem; }
+  section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .pill { display: inline-block; font: 600 0.7rem var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.wait { background: var(--wait-soft); color: var(--wait); }
+  .pill.block { background: var(--block-soft); color: var(--block); }
+
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .strip > div { background: var(--surface); border: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .strip .label { font: 600 0.7rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .strip .value { font-weight: 600; }
+
+  .scroll { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.88rem; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  th { font: 600 0.7rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+  tr:last-child td { border-bottom: 0; }
+  td.k { font-family: var(--font-mono); font-size: 0.82rem; white-space: nowrap; }
+
+  .findings { display: flex; flex-direction: column; gap: 12px; }
+  .finding { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .finding p { color: var(--muted); }
+  .finding strong { color: var(--fg); }
+
+  .phases { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .phase { background: var(--surface); border: 1px solid var(--line); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .phase .eyebrow { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .phase p { font-size: 0.88rem; color: var(--muted); }
+
+  ul.plain { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; max-width: 68ch; }
+  pre { margin: 0; background: var(--code-bg); padding: 12px 14px; overflow-x: auto; font: 400 0.82rem/1.5 var(--font-mono); border: 1px solid var(--line); }
+
+  .log { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); }
+  .log div { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.88rem; }
+  .log .when { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); }
+  @media (max-width: 480px) { .log div { grid-template-columns: 1fr; gap: 2px; } h1 { font-size: 1.6rem; } }
+  @media (prefers-reduced-motion: no-preference) { a { transition: color .15s; } }
+</style>
+
+<main>
+  <header>
+    <span class="eyebrow">Proof of concept · FreeBSD 15.1 · amd64 and arm64</span>
+    <h1>NymVPN on FreeBSD</h1>
+    <p class="lede">The headless NymVPN daemon and CLI now build and run on FreeBSD amd64. The daemon starts, answers <code>nym-vpnc</code> over its socket and reads the live gateway list. A full tunnel connection has not been tested yet because it needs a Nym account.</p>
+    <div class="meta">
+      <span>Report updated 2026-11-09</span>
+      <span>Branch <code>freebsd-port-poc</code> on robster7674/nym-vpn-client</span>
+      <span>Tracking issue <a href="https://github.com/robster7674/nym-vpn-client/issues/1">#1</a> (fork only)</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="status">
+    <h2 id="status">Where things stand</h2>
+    <div class="strip">
+      <div><span class="label">Compile on FreeBSD amd64</span><span class="value"><span class="pill ok">Passing</span></span><span>nym-vpnd, nym-vpnc, nym-socks5-proxy</span></div>
+      <div><span class="label">Daemon and CLI</span><span class="value"><span class="pill ok">Working</span></span><span>status, info, gateway list (632 WireGuard gateways)</span></div>
+      <div><span class="label">Kill switch, DNS, routes</span><span class="value"><span class="pill ok">Tested live</span></span><span>pf, resolvconf, route(8) on a real VM</span></div>
+      <div><span class="label">End-to-end tunnel</span><span class="value"><span class="pill wait">Needs account</span></span><span>no Nym credentials on the test VM, <a href="https://github.com/robster7674/nym-vpn-client/issues/4">#4</a></span></div>
+      <div><span class="label">arm64 build</span><span class="value"><span class="pill block">Blocked at link</span></span><span>Go cannot build the WireGuard archive there, <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a></span></div>
+      <div><span class="label">Upstream</span><span class="value"><span class="pill ok">Untouched</span></span><span>nothing filed or posted to nymtech</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="start">
+    <h2 id="start">Starting point</h2>
+    <p>The only existing upstream trace of FreeBSD was <code>nymtech/nym-vpn-client#2307</code>, a packaging request closed in March 2025. A source read before any compiling suggested the real problem was a port, not a package. The first compile on FreeBSD 15.1 confirmed it, and showed the gap was small.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Crate</th><th>Baseline result on FreeBSD</th></tr></thead>
+      <tbody>
+        <tr><td class="k">nym-routing</td><td>8 errors. No <code>imp</code> module for FreeBSD, so nothing under it resolves.</td></tr>
+        <tr><td class="k">nym-wg-go</td><td><code>build.rs</code> panics with <code>Unsupported platform: freebsd</code>.</td></tr>
+        <tr><td class="k">everything else</td><td>Compiles unchanged. Dependents of the two crates above were blocked, so more errors appeared as each one was cleared.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="env">
+    <h2 id="env">Test environment</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Machine</th><th>Spec</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td class="k">nym-freebsd-poc-1</td><td>FreeBSD 15.1-RELEASE amd64, e2-standard-8, 100 GB, europe-west4-a</td><td>Compile loop and live tests</td></tr>
+        <tr><td class="k">nym-freebsd-poc-arm1</td><td>FreeBSD 15.1-RELEASE arm64, t2a-standard-8, 100 GB, europe-west4-a</td><td>Second architecture</td></tr>
+        <tr><td class="k">UTM on Apple Silicon</td><td>FreeBSD 15.1 aarch64 (VM image, not the installer)</td><td>Manual testing by Rob</td></tr>
+      </tbody>
+    </table></div>
+    <p>Both GCP VMs run in the Performance Insights project, billed to the toolkittribe credit, and SSH is open only from the dev machine. The toolchain is plain FreeBSD packages (rustc 1.98.1, <code>go127</code>, protobuf, cmake). Source is edited in a git worktree on the dev machine, pushed to the fork, and pulled on the VMs.</p>
+  </section>
+
+  <section aria-labelledby="changes">
+    <h2 id="changes">What was changed</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Area</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td class="k">wireguard / nym-wg-go</td><td>FreeBSD added to the libwg Go build tags, the build script's target triple, and the linker setup.</td></tr>
+        <tr><td class="k">nym-routing</td><td>New route manager that runs <code>route(8)</code> for add, change and delete, reads default routes with <code>route -n get</code>, and polls for default-route changes. Follows the macOS model, so the tunnel can use a default node.</td></tr>
+        <tr><td class="k">nym-firewall</td><td>New pf backend. A policy is rendered as pf rules, loaded into the <code>nym</code> anchor with <code>pfctl</code>, and removed again on reset. Covers connecting, connected and blocked states, DNS blocking, LAN and DHCP/NDP rules.</td></tr>
+        <tr><td class="k">nym-dns</td><td>New backend using <code>resolvconf -x</code>, so only the tunnel's servers are used while connected.</td></tr>
+        <tr><td class="k">nym-offline-monitor</td><td>Tracks the presence of default routes through the route manager.</td></tr>
+        <tr><td class="k">nym-ipc</td><td>Unix socket authentication from peer credentials. Root and members of the <code>nym-vpn</code> group are allowed.</td></tr>
+        <tr><td class="k">nym-vpn-lib, nym-vpnd</td><td>FreeBSD added to the desktop code paths: tunnel state machine, local DNS resolver on a loopback alias, tun IPv6 address, command interface. Split tunnelling stays off and reports itself as unsupported.</td></tr>
+        <tr><td class="k">nym-platform-metadata</td><td>Trims the OS strings that feed the user agent (see findings).</td></tr>
+        <tr><td class="k">packaging</td><td>rc.d script <code>nym_vpnd</code> and a build and install README under <code>nym-vpnd/freebsd/</code>.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="findings">
+    <h2 id="findings">What testing on a real FreeBSD host turned up</h2>
+    <div class="findings">
+      <div class="finding">
+        <h3>The daemon refused to start because of a newline</h3>
+        <p>The kernel version string FreeBSD reports ends with a newline. It went into the HTTP <code>User-Agent</code> header and the API client failed with <em>failed to parse header value</em>. <strong>Fixed</strong> by trimming the values, with a regression test.</p>
+      </div>
+      <div class="finding">
+        <h3>pf rejected the NDP rules</h3>
+        <p>pf wants <code>icmp6-type</code> after the addresses, not before. Only a run of the real parser found it. <strong>Fixed</strong>, and an ignored test now feeds every generated policy to <code>pfctl -n</code>.</p>
+      </div>
+      <div class="finding">
+        <h3>pfctl needs root, even for a dry run</h3>
+        <p>On FreeBSD 15 <code>pfctl</code> talks to the kernel over netlink, so <code>-n</code> fails for a normal user. Tests that touch pf are marked ignored and are run as root.</p>
+      </div>
+      <div class="finding">
+        <h3>Go cannot build the WireGuard archive on arm64</h3>
+        <p><code>-buildmode=c-archive</code> is not supported on freebsd/arm64, so <code>libwg.a</code> cannot be produced and <code>nym-vpnd</code> cannot be linked there. Everything else type-checks on arm64. <strong>Open</strong>, tracked in <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a>. A longer-term way out is FreeBSD's in-kernel WireGuard (<code>if_wg</code>), tracked in <a href="https://github.com/robster7674/nym-vpn-client/issues/6">#6</a>.</p>
+      </div>
+      <div class="finding">
+        <h3>The Go toolchain must be 1.27</h3>
+        <p><code>go.mod</code> requires Go 1.27 and the default <code>go</code> package is 1.26. The <code>go127</code> package is used instead.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="results">
+    <h2 id="results">Verification</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Check</th><th>Host</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>cargo check of nym-vpnd, nym-vpnc, nym-socks5-proxy</td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>cargo build, link with libwg (3.2 GB debug daemon)</td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>Unit tests: firewall rules, route parsing, platform metadata</td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>pf parser accepts all three generated policies</td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>Apply a pf policy, check anchor, enable pf, reset to previous state</td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>Add routes via a tun device and the default node, then remove them</td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>Set DNS through resolvconf and restore <code>resolv.conf</code> byte for byte</td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>Start <code>nym-vpnd</code>, <code>nym-vpnc status</code>, <code>info</code>, <code>gateway list wg</code></td><td>amd64</td><td><span class="pill ok">Pass</span></td></tr>
+        <tr><td>rc.d script: start, status, restart, stop, socket cleanup</td><td>amd64</td><td><span class="pill ok">Pass</span> after two fixes to the daemon(8) flags</td></tr>
+        <tr><td>cargo check, firewall, routing and DNS tests</td><td>arm64</td><td><span class="pill wait">Running</span></td></tr>
+        <tr><td>Linking <code>nym-vpnd</code></td><td>arm64</td><td><span class="pill block">Blocked</span> no libwg, see findings</td></tr>
+        <tr><td>Connect through the mixnet or WireGuard</td><td>amd64</td><td><span class="pill wait">Not run</span> needs a Nym account</td></tr>
+        <tr><td>Linux, macOS and Windows builds unchanged</td><td>CI</td><td><span class="pill wait">Not run</span> no cargo on the dev machine; the fork's CI will cover it once a PR is open</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="plan">
+    <h2 id="plan">Phases</h2>
+    <div class="phases">
+      <div class="phase"><span class="eyebrow">Phase 0 <span class="pill ok">Done</span></span><h3>Baseline</h3><p>Compile errors recorded, both VMs ready.</p></div>
+      <div class="phase"><span class="eyebrow">Phase 1 <span class="pill ok">Done on amd64</span></span><h3>Compile and run</h3><p>Builds, links and runs. Mixnet connection untested.</p></div>
+      <div class="phase"><span class="eyebrow">Phase 2 <span class="pill ok">Done</span></span><h3>DNS</h3><p>resolvconf backend verified live.</p></div>
+      <div class="phase"><span class="eyebrow">Phase 3 <span class="pill wait">First version</span></span><h3>Kill switch</h3><p>pf policy verified live. Still replaces the main ruleset while active.</p></div>
+      <div class="phase"><span class="eyebrow">Phase 4 <span class="pill ok">Done on amd64</span></span><h3>IPC and rc.d</h3><p>Peer-credential auth built. <code>service nym_vpnd</code> starts, restarts and stops the daemon. Access for non-root users in the <code>nym-vpn</code> group is not tested yet, because debug builds skip the check.</p></div>
+      <div class="phase"><span class="eyebrow">Phase 5 <span class="pill wait">Not started</span></span><h3>WireGuard mode</h3><p>Compiles on amd64. Untested, and blocked on arm64.</p></div>
+      <div class="phase"><span class="eyebrow">Phase 6 <span class="pill wait">Waiting on Rob</span></span><h3>Upstream</h3><p>A FreeBSD-only issue with real compile output and the questions maintainers need to answer. Nothing posted.</p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="next">
+    <h2 id="next">Open items</h2>
+    <ul class="plain">
+      <li><strong>Needed from Rob:</strong> a Nym account on the amd64 VM, to run <code>nym-vpnc connect</code> and check routes, DNS and the kill switch with real traffic. <a href="https://github.com/robster7674/nym-vpn-client/issues/4">#4</a></li>
+      <li><strong>pf main ruleset:</strong> while a policy is active the daemon replaces the main pf ruleset and restores <code>/etc/pf.conf</code> afterwards. A host with custom pf rules, for example a NAT router, loses them for the session. <a href="https://github.com/robster7674/nym-vpn-client/issues/3">#3</a></li>
+      <li><strong>arm64 WireGuard:</strong> the Go toolchain refuses the archive build. <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a> A native <code>if_wg</code> backend is <a href="https://github.com/robster7674/nym-vpn-client/issues/6">#6</a>.</li>
+      <li><strong>Client access control:</strong> the group check is only exercised by a release build. <a href="https://github.com/robster7674/nym-vpn-client/issues/5">#5</a></li>
+      <li><strong>Not covered yet:</strong> split tunnelling (<a href="https://github.com/robster7674/nym-vpn-client/issues/8">#8</a>) and a native routing socket instead of <code>route(8)</code> (<a href="https://github.com/robster7674/nym-vpn-client/issues/7">#7</a>). The Tauri desktop app is out of scope.</li>
+      <li><strong>Before a pull request:</strong> a green CI run on the other platforms and rustfmt with the repo's nightly settings. <a href="https://github.com/robster7674/nym-vpn-client/issues/9">#9</a></li>
+      <li><strong>Upstream:</strong> nothing is posted to nymtech and nothing will be without approval. <a href="https://github.com/robster7674/nym-vpn-client/issues/10">#10</a></li>
+      <li><strong>Cost:</strong> both VMs are running. Stop them when idle; they bill at roughly the e2-standard-8 and t2a-standard-8 on-demand rates against the toolkittribe credit.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="utm">
+    <h2 id="utm">For the UTM test machine</h2>
+    <p>On an Apple Silicon Mac, download the <strong>VM, aarch64</strong> image of FreeBSD 15.1-RELEASE (not the BASIC-CI one) and import it into UTM as an existing disk with UEFI boot. It matches the GCP arm64 VM. Build steps and the install layout are in <code>nym-vpn-core/crates/nym-vpnd/freebsd/README.md</code>.</p>
+    <pre>pkg install git protobuf go127 cmake pkgconf gmake bash rust
+export PATH=/usr/local/go127/bin:$PATH
+./wireguard/build-wireguard-go.sh      # amd64 only for now
+cd nym-vpn-core &amp;&amp; cargo build -p nym-vpnd -p nym-vpnc</pre>
+  </section>
+
+  <section aria-labelledby="log">
+    <h2 id="log">Update log</h2>
+    <div class="log">
+      <div><span class="when">2026-11-09 issues</span><span>Issues <a href="https://github.com/robster7674/nym-vpn-client/issues/2">#2</a> to <a href="https://github.com/robster7674/nym-vpn-client/issues/10">#10</a> filed on the fork for the open items. The report source now lives in the repository at <code>nym-vpn-core/docs/freebsd-port-report.html</code> and is committed with each update.</span></div>
+      <div><span class="when">2026-11-09 later</span><span>rc.d script verified on amd64 (start, status, restart, stop). The arm64 VM is still compiling its first full check.</span></div>
+      <div><span class="when">2026-11-09</span><span>Report created. amd64 builds, links and runs. pf, route and DNS verified live. rc.d script found to need a flag fix. arm64 checks started; arm64 link blocked by Go.</span></div>
+    </div>
+  </section>
+</main>
