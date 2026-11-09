@@ -18,6 +18,20 @@ pub fn set_ipv6_addr(device_name: &str, ipv6_addr: Ipv6Addr) -> io::Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "freebsd")]
+pub fn set_ipv6_addr(device_name: &str, ipv6_addr: Ipv6Addr) -> io::Result<()> {
+    Command::new("ifconfig")
+        .args([
+            device_name,
+            "inet6",
+            &ipv6_addr.to_string(),
+            "prefixlen",
+            "128",
+        ])
+        .output()?;
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 pub fn set_ipv6_addr(device_name: &str, ipv6_addr: Ipv6Addr) -> io::Result<()> {
     Command::new("ifconfig")

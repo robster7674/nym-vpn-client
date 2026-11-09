@@ -45,7 +45,7 @@ use nym_vpn_lib_types::ErrorStateReason;
 use nym_vpn_lib_types::SplitApp;
 #[cfg(target_os = "linux")]
 use nym_vpn_lib_types::SplitTunnelExcludedProcess;
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 use nym_vpn_lib_types::SplitTunnelExcludedProcessList;
 use nym_vpn_lib_types::{
     AccountBalanceResponse, AccountCommandError, AccountControllerState, AppCompatibility,
@@ -264,7 +264,7 @@ pub enum VpnServiceCommand {
     RemoveSplitTunnelApp(oneshot::Sender<()>, SplitApp),
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     ClearSplitTunnelApps(oneshot::Sender<()>, ()),
-    #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     GetSplitTunnelExcludedProcesses(oneshot::Sender<SplitTunnelExcludedProcessList>, ()),
     #[cfg(target_os = "linux")]
     AddSplitTunnelProcess(oneshot::Sender<()>, i32),
@@ -1367,7 +1367,7 @@ impl NymVpnService {
                 self.handle_clear_split_tunnel_apps().await;
                 let _ = tx.send(());
             }
-            #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
             VpnServiceCommand::GetSplitTunnelExcludedProcesses(tx, ()) => {
                 let excluded_processes = self.handle_get_split_tunnel_excluded_processes().await;
                 let _ = tx.send(excluded_processes);
@@ -2513,7 +2513,13 @@ impl NymVpnService {
             self.split_tunnel_pid_manager.is_supported()
         }
 
-        #[cfg(not(target_os = "linux"))]
+        // Split tunnelling is not implemented on FreeBSD.
+        #[cfg(target_os = "freebsd")]
+        {
+            false
+        }
+
+        #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         {
             true
         }
