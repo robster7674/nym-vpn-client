@@ -1910,6 +1910,7 @@ impl TunnelMonitor {
             #[cfg(windows)]
             tun_config.tun_name(MIXNET_WINTUN_NAME);
 
+            #[cfg(not(target_os = "freebsd"))]
             tun_config
                 .address(interface_ipv4)
                 .netmask(Ipv4Addr::BROADCAST)
@@ -1923,6 +1924,16 @@ impl TunnelMonitor {
 
             tun::create_as_async(&tun_config).map_err(Error::CreateTunDevice)?
         };
+
+        #[cfg(target_os = "freebsd")]
+        {
+            let tun_name = tun_device
+                .deref()
+                .tun_name()
+                .map_err(Error::GetTunDeviceName)?;
+            tun_ipv6::set_ipv4_addr(&tun_name, interface_ipv4, None, mtu)
+                .map_err(Error::SetTunDeviceIpv4Addr)?;
+        }
 
         #[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
         if let Some(interface_ipv6) = interface_ipv6 {
@@ -1965,14 +1976,17 @@ impl TunnelMonitor {
     ) -> Result<AsyncDevice> {
         let mut tun_config = tun::Configuration::default();
 
-        tun_config
-            .address(interface_ipv4)
-            .netmask(Ipv4Addr::BROADCAST)
-            .mtu(mtu)
-            .up();
+        #[cfg(not(target_os = "freebsd"))]
+        {
+            tun_config
+                .address(interface_ipv4)
+                .netmask(Ipv4Addr::BROADCAST)
+                .mtu(mtu)
+                .up();
 
-        if let Some(destination) = destination {
-            tun_config.destination(destination);
+            if let Some(destination) = destination {
+                tun_config.destination(destination);
+            }
         }
 
         #[cfg(target_os = "macos")]
@@ -1986,6 +2000,10 @@ impl TunnelMonitor {
             .deref()
             .tun_name()
             .map_err(Error::GetTunDeviceName)?;
+
+        #[cfg(target_os = "freebsd")]
+        tun_ipv6::set_ipv4_addr(&tun_name, interface_ipv4, destination, mtu)
+            .map_err(Error::SetTunDeviceIpv4Addr)?;
 
         if let Some(interface_ipv6) = interface_ipv6 {
             tun_ipv6::set_ipv6_addr(&tun_name, interface_ipv6)

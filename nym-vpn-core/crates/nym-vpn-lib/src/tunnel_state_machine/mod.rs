@@ -1719,6 +1719,10 @@ pub enum Error {
     #[error("failed to set tunnel device ipv6 address")]
     SetTunDeviceIpv6Addr(#[source] std::io::Error),
 
+    #[cfg(target_os = "freebsd")]
+    #[error("failed to set tunnel device ipv4 address")]
+    SetTunDeviceIpv4Addr(#[source] std::io::Error),
+
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     #[error("failed to add routes")]
     AddRoutes(#[source] route_handler::Error),
@@ -1775,6 +1779,8 @@ impl Error {
             Self::CreateTunDevice(_) => ErrorStateReason::TunDevice,
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             Self::SetTunDeviceIpv6Addr(_) => ErrorStateReason::TunDevice,
+            #[cfg(target_os = "freebsd")]
+            Self::SetTunDeviceIpv4Addr(_) => ErrorStateReason::TunDevice,
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             Self::GetTunDeviceName(_) => ErrorStateReason::TunDevice,
             Self::GetInterfaceIpSender => ErrorStateReason::Internal(self.to_string()),
