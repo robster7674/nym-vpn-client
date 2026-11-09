@@ -101,3 +101,20 @@ impl Default for SysInfo {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The values end up in the `User-Agent` header, so they must be printable ASCII.
+    #[test]
+    fn sys_info_is_valid_in_a_header() {
+        let sys_info = SysInfo::new();
+        for value in [&sys_info.system_name, &sys_info.os_version, &sys_info.arch] {
+            assert!(
+                value.bytes().all(|byte| (0x20..0x7f).contains(&byte)),
+                "not printable ASCII: {value:?}"
+            );
+        }
+    }
+}
