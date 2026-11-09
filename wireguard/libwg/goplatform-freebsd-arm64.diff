@@ -1,0 +1,17 @@
+Allow -buildmode=c-archive on freebsd/arm64.
+
+The Go runtime has the library entry point for freebsd/arm64
+(_rt0_arm64_freebsd_lib), but the platform table in cmd/go, cmd/compile and
+cmd/link only lists freebsd/amd64. Tested with Go 1.27.3.
+
+--- a/src/internal/platform/supported.go
++++ b/src/internal/platform/supported.go
+@@ -156,7 +156,7 @@
+ 				return false
+ 			}
+ 		case "freebsd":
+-			return goarch == "amd64"
++			return goarch == "amd64" || goarch == "arm64"
+ 		}
+ 		return false
+ 

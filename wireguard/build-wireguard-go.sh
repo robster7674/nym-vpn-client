@@ -189,6 +189,10 @@ function unix_target_triple {
 function build_unix {
     echo "Building wireguard-go for $1"
 
+    if [[ "$1" == "aarch64-unknown-freebsd" ]]; then
+        patch_go_freebsd_arm64
+    fi
+
     # Flags for cross compiling
     if [[ "$(unix_target_triple)" != "$1" ]]; then
         # Linux arm
@@ -298,6 +302,30 @@ function build_ios {
     unset ARCH
 
     popd
+}
+
+# Go does not allow -buildmode=c-archive on freebsd/arm64 although the runtime supports it. Build
+# the Go tools from a patched copy of GOROOT that lists the platform.
+function patch_go_freebsd_arm64 {
+    echo "Patching the go platform table for freebsd/arm64"
+
+    local real_goroot
+    real_goroot=$(go env GOROOT 2>/dev/null)
+    local patched_goroot="$(pwd)/../build/goroot"
+
+    rm -rf "$patched_goroot"
+    mkdir -p "$patched_goroot"
+    cp -R "$real_goroot/." "$patched_goroot/"
+    patch -p1 -f -N -r- -d "$patched_goroot" < "$LIB_DIR/goplatform-freebsd-arm64.diff"
+
+    export GOROOT="$patched_goroot"
+    export PATH="$GOROOT/bin:$PATH"
+    local tool_dir
+    tool_dir=$(GOROOT="$GOROOT" "$real_goroot/bin/go" env GOTOOLDIR)
+    (cd "$GOROOT/src" && "$real_goroot/bin/go" build -o "$GOROOT/bin/go" cmd/go)
+    for tool in compile link; do
+        (cd "$GOROOT/src" && "$real_goroot/bin/go" build -o "$tool_dir/$tool" cmd/$tool)
+    done
 }
 
 function patch_go_runtime {
