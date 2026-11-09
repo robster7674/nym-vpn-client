@@ -32,7 +32,7 @@ fn main() {
 
     let link_type = match target_os.as_str() {
         "android" => "",
-        "linux" | "macos" | "ios" => "=static",
+        "linux" | "macos" | "ios" | "freebsd" => "=static",
         "windows" => "=dylib",
         _ => panic!("Unsupported platform: {target_os}"),
     };

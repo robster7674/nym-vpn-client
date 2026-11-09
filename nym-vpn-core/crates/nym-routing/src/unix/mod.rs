@@ -6,6 +6,8 @@
 use crate::Route;
 #[cfg(target_os = "macos")]
 pub use crate::{Gateway, imp::imp::DefaultRoute};
+#[cfg(target_os = "freebsd")]
+pub use imp::DefaultRoute;
 
 use super::RequiredRoute;
 
@@ -26,13 +28,18 @@ pub mod imp;
 mod imp;
 
 #[allow(clippy::module_inception)]
+#[cfg(target_os = "freebsd")]
+#[path = "freebsd.rs"]
+mod imp;
+
+#[allow(clippy::module_inception)]
 #[cfg(any(target_os = "android", target_os = "ios"))]
 #[path = "android.rs"]
 mod imp;
 
 pub use imp::Error as PlatformError;
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "freebsd"))]
 pub use imp::get_default_route_interfaces;
 
 /// Errors that can be encountered whilst initializing route manager
@@ -124,6 +131,21 @@ pub(crate) enum RouteManagerCommand {
     GetDefaultGateway(oneshot::Sender<(Option<Gateway>, Option<Gateway>)>),
 }
 
+/// Commands for the underlying route manager object.
+#[cfg(target_os = "freebsd")]
+#[derive(Debug)]
+pub(crate) enum RouteManagerCommand {
+    AddRoutes(
+        HashSet<RequiredRoute>,
+        oneshot::Sender<Result<(), PlatformError>>,
+    ),
+    ClearRoutes,
+    Shutdown(oneshot::Sender<()>),
+    RefreshRoutes,
+    NewDefaultRouteListener(oneshot::Sender<mpsc::UnboundedReceiver<DefaultRouteEvent>>),
+    GetDefaultRoutes(oneshot::Sender<(Option<DefaultRoute>, Option<DefaultRoute>)>),
+}
+
 /// Event that is sent when interface details may have changed for some interface.
 #[cfg(target_os = "macos")]
 pub struct InterfaceEvent {
@@ -136,7 +158,7 @@ pub struct InterfaceEvent {
 
 /// Event that is sent when a preferred non-tunnel default route is
 /// added or removed.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 #[derive(Debug, Clone, Copy)]
 pub enum DefaultRouteEvent {
     /// Added or updated a non-tunnel default IPv4 route
@@ -214,7 +236,7 @@ impl RouteManagerHandle {
     }
 
     /// Listen for non-tunnel default route changes.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
     pub async fn default_route_listener(
         &self,
     ) -> Result<mpsc::UnboundedReceiver<DefaultRouteEvent>, Error> {
@@ -226,7 +248,7 @@ impl RouteManagerHandle {
     }
 
     /// Get current non-tunnel default routes.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
     pub async fn get_default_routes(
         &self,
     ) -> Result<(Option<DefaultRoute>, Option<DefaultRoute>), Error> {
@@ -260,7 +282,7 @@ impl RouteManagerHandle {
     }
 
     /// Get current non-tunnel default routes.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
     pub fn refresh_routes(&self) -> Result<(), Error> {
         self.tx
             .send(RouteManagerCommand::RefreshRoutes)

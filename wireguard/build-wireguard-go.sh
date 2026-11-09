@@ -172,6 +172,14 @@ function unix_target_triple {
             arch="aarch64"
         fi
         echo "${arch}-apple-darwin"
+    elif [[ ("${platform}" == "FreeBSD") ]]; then
+        local arch="$(uname -m)"
+        if [[ ("${arch}" == "amd64") ]]; then
+            arch="x86_64"
+        elif [[ ("${arch}" == "arm64") ]]; then
+            arch="aarch64"
+        fi
+        echo "${arch}-unknown-freebsd"
     else
         echo "Can't deduce target dir for $platform"
         return 1
@@ -341,6 +349,7 @@ function build_wireguard_go {
     case  "$platform" in
         Darwin*) build_macos;;
         Linux*) build_unix ${1:-$(unix_target_triple)};;
+        FreeBSD*) build_unix ${1:-$(unix_target_triple)};;
         MINGW*|MSYS_NT*) build_windows;;
     esac
 }

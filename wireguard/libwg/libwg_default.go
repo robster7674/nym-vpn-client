@@ -1,4 +1,4 @@
-//go:build (darwin || linux) && !android && !ios
+//go:build (darwin || freebsd || linux) && !android && !ios
 
 /* SPDX-License-Identifier: Apache-2.0
  *

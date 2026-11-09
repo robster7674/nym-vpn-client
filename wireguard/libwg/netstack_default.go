@@ -1,4 +1,4 @@
-//go:build (darwin || linux || windows) && !android && !ios
+//go:build (darwin || freebsd || linux || windows) && !android && !ios
 
 /* SPDX-License-Identifier: MIT
  *
