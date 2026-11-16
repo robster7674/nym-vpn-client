@@ -165,6 +165,10 @@ function unix_target_triple {
     local platform="$(uname -s)"
     if [[ ("${platform}" == "Linux") ]]; then
         local arch="$(uname -m)"
+        # Rust names the riscv64 Linux target riscv64gc
+        if [[ ("${arch}" == "riscv64") ]]; then
+            arch="riscv64gc"
+        fi
         echo "${arch}-unknown-linux-gnu"
     elif [[ ("${platform}" == "Darwin") ]]; then
         local arch="$(uname -m)"
@@ -188,6 +192,10 @@ function build_unix {
             export CGO_ENABLED=1
             export GOARCH=arm64
             export CC=aarch64-linux-gnu-gcc
+        elif [[ "$1" == "riscv64gc-unknown-linux-gnu" ]]; then
+            export CGO_ENABLED=1
+            export GOARCH=riscv64
+            export CC=riscv64-linux-gnu-gcc
         fi
     fi
 
