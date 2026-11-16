@@ -165,6 +165,10 @@ function unix_target_triple {
     local platform="$(uname -s)"
     if [[ ("${platform}" == "Linux") ]]; then
         local arch="$(uname -m)"
+        # Rust names the riscv64 Linux target riscv64gc
+        if [[ ("${arch}" == "riscv64") ]]; then
+            arch="riscv64gc"
+        fi
         echo "${arch}-unknown-linux-gnu"
     elif [[ ("${platform}" == "Darwin") ]]; then
         local arch="$(uname -m)"

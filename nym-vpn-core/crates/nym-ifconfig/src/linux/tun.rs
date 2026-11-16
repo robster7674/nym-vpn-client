@@ -96,14 +96,14 @@ impl<T: AsFd> Tun<'_, T> {
         let mut req: ifreq = unsafe { std::mem::zeroed() };
         unsafe { tungetiff(self.tun_fd.as_fd().as_raw_fd(), &mut req as *mut _ as _)? };
 
-        #[cfg(not(target_arch = "aarch64"))]
+        #[cfg(not(any(target_arch = "aarch64", target_arch = "riscv64")))]
         let bytes = req
             .ifr_name
             .into_iter()
             .map(|c| c as u8)
             .collect::<Vec<_>>();
 
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
         let bytes = req.ifr_name;
 
         CStr::from_bytes_until_nul(&bytes)

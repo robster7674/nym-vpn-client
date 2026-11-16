@@ -1,0 +1,95 @@
+name: ci-nym-vpn-core-linux-riscv64
+
+# Native riscv64 build on the RISE RISC-V runners (https://ci.riseproject.dev/).
+# Needs the RISE GitHub App installed on the repo, otherwise the job stays queued.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "nym-vpn-core/crates/**"
+      - "nym-vpn-core/Cargo.toml"
+      - "nym-vpn-core/Cargo.lock"
+      - "wireguard/**"
+      - ".github/workflows/ci-nym-vpn-core-linux-riscv64.yml"
+  workflow_dispatch:
+
+env:
+  CI_TESTING: true
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-riscv
+    # The runners are slow (4-core TH1520) and run one job per node
+    timeout-minutes: 600
+
+    steps:
+      - name: Install system dependencies
+        # protoc comes from apt: 3.21.12 on ubuntu 24.04, and there is no upstream riscv64 release
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev libmnl-dev libnftnl-dev protobuf-compiler git curl gcc g++ make pkg-config unzip jq libnm-dev libgtk-3-dev libgtk-4-dev
+
+      - name: Checkout repo
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Install Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          cache-dependency-path: wireguard/libwg/go.sum
+
+      - name: Build wireguard
+        run: ./wireguard/build-wireguard-go.sh
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: clippy
+
+      - name: Print toolchain info
+        run: |
+          uname -m
+          rustc -vV
+          go version
+          protoc --version
+
+      - name: Clippy
+        working-directory: nym-vpn-core
+        run: |
+          cargo clippy --workspace --locked -- -Dwarnings
+
+      - name: Build
+        working-directory: nym-vpn-core
+        run: |
+          cargo build --profile ci --workspace --locked
+
+      - name: Build tests
+        working-directory: nym-vpn-core
+        run: |
+          CARGO_OUTPUT=$(cargo test --profile ci --no-run --workspace --locked --message-format json)
+
+          NYM_CONNECTION_MONITOR_TESTS_BIN=$(echo "$CARGO_OUTPUT" | jq --raw-output 'select(.reason == "compiler-artifact" and .target.name == "nym_connection_monitor" and .executable != null) | .executable')
+
+          echo "Found test binary for nym-connection-monitor: $NYM_CONNECTION_MONITOR_TESTS_BIN"
+          sudo setcap 'cap_net_raw+ep' $NYM_CONNECTION_MONITOR_TESTS_BIN
+
+      - name: Run tests
+        working-directory: nym-vpn-core
+        run: |
+          cargo test --profile ci --workspace --locked --exclude nym-ifconfig
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: nym-vpn-core_riscv64gc-unknown-linux-gnu
+          path: |
+            nym-vpn-core/target/ci/nym-vpnd
+            nym-vpn-core/target/ci/nym-vpnc
+          if-no-files-found: error
+          retention-days: 7
