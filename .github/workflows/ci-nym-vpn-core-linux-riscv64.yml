@@ -1,7 +1,8 @@
 name: ci-nym-vpn-core-linux-riscv64
 
 # Native riscv64 build on the RISE RISC-V runners (https://ci.riseproject.dev/).
-# Needs the RISE GitHub App installed on the repo, otherwise the job stays queued.
+# Needs the RISE GitHub App installed on the repo, otherwise the job stays queued,
+# so PR runs are gated on the RISCV_RUNNERS repo variable being "true".
 
 on:
   pull_request:
@@ -11,15 +12,22 @@ on:
       - "nym-vpn-core/Cargo.toml"
       - "nym-vpn-core/Cargo.lock"
       - "wireguard/**"
+      - ".env"
       - ".github/workflows/ci-nym-vpn-core-linux-riscv64.yml"
   workflow_dispatch:
 
 env:
   CI_TESTING: true
   CARGO_TERM_COLOR: always
+  AGENT_ISSELFHOSTED: 1 # https://github.com/actions/setup-go/issues/432
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    if: vars.RISCV_RUNNERS == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04-riscv
     # The runners are slow (4-core TH1520) and run one job per node
     timeout-minutes: 600
@@ -83,6 +91,9 @@ jobs:
         working-directory: nym-vpn-core
         run: |
           cargo test --profile ci --workspace --locked --exclude nym-ifconfig
+
+      - name: Test NetworkManager editor plugin
+        run: make -C nym-vpn-core/crates/nym-nm-vpn-plugin/editor test
 
       - name: Upload binaries
         uses: actions/upload-artifact@v7.0.1

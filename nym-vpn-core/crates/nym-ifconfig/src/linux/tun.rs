@@ -96,15 +96,9 @@ impl<T: AsFd> Tun<'_, T> {
         let mut req: ifreq = unsafe { std::mem::zeroed() };
         unsafe { tungetiff(self.tun_fd.as_fd().as_raw_fd(), &mut req as *mut _ as _)? };
 
-        #[cfg(not(any(target_arch = "aarch64", target_arch = "riscv64")))]
-        let bytes = req
-            .ifr_name
-            .into_iter()
-            .map(|c| c as u8)
-            .collect::<Vec<_>>();
-
-        #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
-        let bytes = req.ifr_name;
+        // c_char is i8 or u8 depending on the target
+        #[allow(clippy::unnecessary_cast)]
+        let bytes = req.ifr_name.map(|c| c as u8);
 
         CStr::from_bytes_until_nul(&bytes)
             .map_err(|err| TunError::new(TunErrorKind::InterfaceNameIntoString, err))?

@@ -192,6 +192,10 @@ function build_unix {
             export CGO_ENABLED=1
             export GOARCH=arm64
             export CC=aarch64-linux-gnu-gcc
+        elif [[ "$1" == "riscv64gc-unknown-linux-gnu" ]]; then
+            export CGO_ENABLED=1
+            export GOARCH=riscv64
+            export CC=riscv64-linux-gnu-gcc
         fi
     fi
 
