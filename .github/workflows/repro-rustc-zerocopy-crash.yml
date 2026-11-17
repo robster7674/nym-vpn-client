@@ -1,0 +1,85 @@
+name: repro-rustc-zerocopy-crash
+
+# Throwaway: try to reproduce the rustc SIGABRT ("corrupted double-linked list")
+# seen while compiling zerocopy 0.8.63 in run 43842725611 attempt 1 (riscv-runner-36).
+# Replays the exact rustc invocation from that log in a loop, alone and under parallel load.
+
+on:
+  push:
+    branches: [repro/rustc-zerocopy-crash]
+
+jobs:
+  repro:
+    runs-on: ubuntu-24.04-riscv
+    timeout-minutes: 240
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Dotenv Action
+        uses: xom9ikk/dotenv@v2.4.0
+
+      - name: Install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Machine info
+        run: |
+          hostname
+          uname -a
+          nproc
+          free -m
+          rustc -vV
+          ldd --version | head -1
+
+      - name: Fetch zerocopy source
+        working-directory: nym-vpn-core
+        run: cargo fetch --locked
+
+      - name: Replay rustc on zerocopy
+        working-directory: nym-vpn-core
+        run: |
+          set -u
+          SRC=$(ls -d "$CARGO_HOME"/registry/src/index.crates.io-*/zerocopy-0.8.63 | head -1)
+          RUSTC="$CARGO_HOME/../.rustup/toolchains/${RUST_VERSION}-riscv64gc-unknown-linux-gnu/bin/rustc"
+          [ -x "$RUSTC" ] || RUSTC=$(rustup which rustc)
+          echo "rustc: $RUSTC"; echo "src: $SRC"
+
+          compile() {
+            out=$(mktemp -d)
+            "$RUSTC" --crate-name zerocopy --edition=2021 "$SRC/src/lib.rs" \
+              --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat \
+              --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no \
+              --cfg 'feature="simd"' -C metadata=17e749fc1d1d6ea3 -C extra-filename=-e06e5827b5303255 \
+              --out-dir "$out" -C strip=debuginfo --cap-lints allow >"$out/log" 2>&1
+            rc=$?
+            if [ $rc -ne 0 ]; then echo "::error::rustc exited $rc ($1)"; cat "$out/log"; fi
+            rm -rf "$out"
+            return $rc
+          }
+
+          fails=0
+          echo "## Sequential: 30 runs"
+          for i in $(seq 1 30); do
+            start=$(date +%s)
+            compile "seq $i" || fails=$((fails+1))
+            echo "seq $i: $(( $(date +%s) - start ))s, failures so far: $fails"
+          done
+
+          echo "## Parallel: 10 rounds x $(nproc) concurrent"
+          for r in $(seq 1 10); do
+            pids=()
+            for j in $(seq 1 "$(nproc)"); do compile "par $r.$j" & pids+=($!); done
+            for p in "${pids[@]}"; do wait "$p" || fails=$((fails+1)); done
+            echo "par round $r done, failures so far: $fails"
+          done
+
+          echo "Total failures: $fails"
+          [ "$fails" -eq 0 ]
+
+      - name: Kernel log
+        if: always()
+        run: sudo dmesg | tail -50 || true
