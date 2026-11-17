@@ -48,6 +48,11 @@ jobs:
           [ -x "$RUSTC" ] || RUSTC=$(rustup which rustc)
           echo "rustc: $RUSTC"; echo "src: $SRC"
 
+          # rustc run outside cargo needs the env cargo would set
+          export CARGO_PKG_NAME=zerocopy CARGO_PKG_VERSION=0.8.63 CARGO_PKG_VERSION_MAJOR=0 \
+            CARGO_PKG_VERSION_MINOR=8 CARGO_PKG_VERSION_PATCH=63 CARGO_PKG_VERSION_PRE= \
+            CARGO_CRATE_NAME=zerocopy CARGO_MANIFEST_DIR="$SRC" CARGO_MANIFEST_PATH="$SRC/Cargo.toml"
+
           compile() {
             out=$(mktemp -d)
             "$RUSTC" --crate-name zerocopy --edition=2021 "$SRC/src/lib.rs" \
@@ -56,21 +61,23 @@ jobs:
               --cfg 'feature="simd"' -C metadata=17e749fc1d1d6ea3 -C extra-filename=-e06e5827b5303255 \
               --out-dir "$out" -C strip=debuginfo --cap-lints allow >"$out/log" 2>&1
             rc=$?
-            if [ $rc -ne 0 ]; then echo "::error::rustc exited $rc ($1)"; cat "$out/log"; fi
+            if [ $rc -ne 0 ]; then echo "::error::rustc exited $rc ($1)"; tail -c 4000 "$out/log"; fi
             rm -rf "$out"
+            # A plain compile error means this harness is wrong, not a crash: stop early
+            if [ $rc -ne 0 ] && [ $rc -lt 101 ]; then echo "::error::harness problem, stopping"; exit 2; fi
             return $rc
           }
 
           fails=0
-          echo "## Sequential: 30 runs"
-          for i in $(seq 1 30); do
+          echo "## Sequential: 60 runs"
+          for i in $(seq 1 60); do
             start=$(date +%s)
             compile "seq $i" || fails=$((fails+1))
             echo "seq $i: $(( $(date +%s) - start ))s, failures so far: $fails"
           done
 
-          echo "## Parallel: 10 rounds x $(nproc) concurrent"
-          for r in $(seq 1 10); do
+          echo "## Parallel: 20 rounds x $(nproc) concurrent"
+          for r in $(seq 1 20); do
             pids=()
             for j in $(seq 1 "$(nproc)"); do compile "par $r.$j" & pids+=($!); done
             for p in "${pids[@]}"; do wait "$p" || fails=$((fails+1)); done
