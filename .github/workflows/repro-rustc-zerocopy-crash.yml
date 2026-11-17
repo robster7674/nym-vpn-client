@@ -1,18 +1,28 @@
 name: repro-rustc-zerocopy-crash
 
-# Throwaway: try to reproduce the rustc SIGABRT ("corrupted double-linked list")
-# seen while compiling zerocopy 0.8.63 in run 43842725611 attempt 1 (riscv-runner-36).
-# Replays the exact rustc invocation from that log in a loop, alone and under parallel load.
+# Throwaway: reproduce the rustc SIGABRT ("corrupted double-linked list") seen while
+# compiling zerocopy 0.8.63 in run 43842725611 attempt 1 (riscv-runner-36), and keep
+# a core dump of it. Phase 1 replays the exact rustc call in a loop, alone and under
+# parallel load. Phase 2 repeats the full workspace build, where the crash first hit.
+# Every compiler process runs with a scrubbed environment, so cores carry no CI tokens.
 
 on:
   push:
     branches: [repro/rustc-zerocopy-crash]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: never
+  AGENT_ISSELFHOSTED: 1
 
 jobs:
   repro:
     runs-on: ubuntu-24.04-riscv
-    timeout-minutes: 240
+    timeout-minutes: 600
     steps:
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev libmnl-dev libnftnl-dev protobuf-compiler git curl gcc g++ make pkg-config unzip jq libnm-dev libgtk-3-dev libgtk-4-dev gdb zstd
+
       - name: Checkout repo
         uses: actions/checkout@v7.0.1
         with:
@@ -21,6 +31,12 @@ jobs:
       - name: Dotenv Action
         uses: xom9ikk/dotenv@v2.4.0
 
+      - name: Install Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+          cache-dependency-path: wireguard/libwg/go.sum
+
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -28,64 +44,138 @@ jobs:
 
       - name: Machine info
         run: |
-          hostname
-          uname -a
-          nproc
-          free -m
+          hostname; uname -a; nproc; free -m
           rustc -vV
           ldd --version | head -1
+          cat /proc/sys/kernel/core_pattern
 
-      - name: Fetch zerocopy source
-        working-directory: nym-vpn-core
-        run: cargo fetch --locked
+      - name: Set up core dumps
+        run: |
+          CORES="$RUNNER_TEMP/cores"; mkdir -p "$CORES"; chmod 1777 "$CORES"
+          echo "CORES=$CORES" >> "$GITHUB_ENV"
+          sudo sysctl -w kernel.core_pattern="$CORES/core.%e.%p.%t" || true
+          echo "core_pattern: $(cat /proc/sys/kernel/core_pattern)"
+          # Self-test: an aborted process must leave a core, or phase 1 falls back to gdb
+          (ulimit -c unlimited; sleep 60 & p=$!; sleep 1; kill -ABRT $p; wait $p) || true
+          sleep 2
+          if ls "$CORES"/core.sleep.* >/dev/null 2>&1; then
+            echo "Kernel core dumps work"; echo "KERNEL_CORES=1" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No kernel core dump; phase 1 runs rustc under gdb, phase 2 is skipped"
+            echo "KERNEL_CORES=0" >> "$GITHUB_ENV"
+          fi
+          rm -f "$CORES"/core.sleep.*
 
-      - name: Replay rustc on zerocopy
+      - name: Fetch sources and build wireguard
+        run: |
+          (cd nym-vpn-core && cargo fetch --locked)
+          ./wireguard/build-wireguard-go.sh
+
+      - name: "Phase 1: replay rustc on zerocopy"
+        id: phase1
         working-directory: nym-vpn-core
+        timeout-minutes: 120
         run: |
           set -u
           SRC=$(ls -d "$CARGO_HOME"/registry/src/index.crates.io-*/zerocopy-0.8.63 | head -1)
-          RUSTC="$CARGO_HOME/../.rustup/toolchains/${RUST_VERSION}-riscv64gc-unknown-linux-gnu/bin/rustc"
-          [ -x "$RUSTC" ] || RUSTC=$(rustup which rustc)
-          echo "rustc: $RUSTC"; echo "src: $SRC"
-
-          # rustc run outside cargo needs the env cargo would set
-          export CARGO_PKG_NAME=zerocopy CARGO_PKG_VERSION=0.8.63 CARGO_PKG_VERSION_MAJOR=0 \
-            CARGO_PKG_VERSION_MINOR=8 CARGO_PKG_VERSION_PATCH=63 CARGO_PKG_VERSION_PRE= \
-            CARGO_CRATE_NAME=zerocopy CARGO_MANIFEST_DIR="$SRC" CARGO_MANIFEST_PATH="$SRC/Cargo.toml"
+          RUSTC=$(rustup which rustc)
+          echo "rustc: $RUSTC"; echo "src: $SRC"; echo "RUSTC_BIN=$RUSTC" >> "$GITHUB_ENV"
+          ulimit -c unlimited
+          deadline=$(( $(date +%s) + 100*60 ))
 
           compile() {
             out=$(mktemp -d)
-            "$RUSTC" --crate-name zerocopy --edition=2021 "$SRC/src/lib.rs" \
+            # Scrubbed env: only what rustc needs, so a core holds no secrets
+            set -- env -i PATH=/usr/bin:/bin HOME=/tmp CARGO_PKG_NAME=zerocopy CARGO_PKG_VERSION=0.8.63 \
+              CARGO_CRATE_NAME=zerocopy CARGO_MANIFEST_DIR="$SRC" \
+              "$RUSTC" --crate-name zerocopy --edition=2021 "$SRC/src/lib.rs" \
               --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat \
               --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no \
               --cfg 'feature="simd"' -C metadata=17e749fc1d1d6ea3 -C extra-filename=-e06e5827b5303255 \
-              --out-dir "$out" -C strip=debuginfo --cap-lints allow >"$out/log" 2>&1
-            rc=$?
-            if [ $rc -ne 0 ]; then echo "::error::rustc exited $rc ($1)"; tail -c 4000 "$out/log"; fi
+              --out-dir "$out" -C strip=debuginfo --cap-lints allow
+            if [ "$KERNEL_CORES" = 1 ]; then
+              "$@" >"$out/log" 2>&1; rc=$?
+            else
+              gdb -q -batch -nx -return-child-result -ex 'set pagination off' -ex run \
+                -ex "generate-core-file $CORES/core.rustc.gdb.$$.$RANDOM" -ex 'thread apply all bt' \
+                --args "$@" >"$out/log" 2>&1; rc=$?
+              grep -q 'received signal' "$out/log" || rc=0
+              [ $rc -eq 0 ] && rm -f "$CORES"/core.rustc.gdb.*
+            fi
+            if [ $rc -ne 0 ]; then echo "::error::rustc exited $rc"; tail -c 6000 "$out/log"; cp "$out/log" "$CORES/" || true; fi
             rm -rf "$out"
-            # A plain compile error means this harness is wrong, not a crash: stop early
-            if [ $rc -ne 0 ] && [ $rc -lt 101 ]; then echo "::error::harness problem, stopping"; exit 2; fi
             return $rc
           }
 
-          fails=0
-          echo "## Sequential: 60 runs"
-          for i in $(seq 1 60); do
-            start=$(date +%s)
-            compile "seq $i" || fails=$((fails+1))
-            echo "seq $i: $(( $(date +%s) - start ))s, failures so far: $fails"
+          n=0
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            n=$((n+1))
+            compile || break
+            if [ $((n % 5)) -eq 0 ]; then
+              # Parallel round: one compile per core at once
+              pids=(); for j in $(seq 1 "$(nproc)"); do compile & pids+=($!); done
+              for p in "${pids[@]}"; do wait "$p" || touch "$RUNNER_TEMP/phase1-failed"; done
+              [ -e "$RUNNER_TEMP/phase1-failed" ] && break
+            fi
+            echo "iteration $n ok ($(date -u +%H:%M:%S))"
+          done
+          if ls "$CORES"/core.* >/dev/null 2>&1 || [ -e "$RUNNER_TEMP/phase1-failed" ] || [ "$(date +%s)" -lt "$deadline" ]; then
+            echo "Phase 1 stopped on a failure after $n iterations"; echo "crashed=1" >> "$GITHUB_OUTPUT"; exit 1
+          fi
+          echo "Phase 1: no crash in $n iterations"
+
+      - name: "Phase 2: repeat the full workspace build"
+        if: steps.phase1.outputs.crashed != '1' && env.KERNEL_CORES == '1'
+        working-directory: nym-vpn-core
+        run: |
+          set -u
+          ulimit -c unlimited
+          i=0
+          while true; do
+            i=$((i+1)); echo "## Full build $i ($(date -u +%H:%M:%S))"
+            env -i PATH="$HOME/.cargo/bin:/usr/bin:/bin" HOME="$HOME" CARGO_HOME="$CARGO_HOME" \
+              RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" RUSTUP_TOOLCHAIN="$RUST_VERSION" CARGO_TERM_COLOR=never \
+              cargo build --profile ci --workspace --locked > "$RUNNER_TEMP/build.log" 2>&1
+            rc=$?
+            if [ $rc -ne 0 ] || ls "$CORES"/core.* >/dev/null 2>&1; then
+              echo "::error::full build $i failed (rc $rc)"; grep -B2 -A6 -E 'error|signal|corrupt' "$RUNNER_TEMP/build.log" | tail -60
+              cp "$RUNNER_TEMP/build.log" "$CORES/"; exit 1
+            fi
+            cargo clean --profile ci
           done
 
-          echo "## Parallel: 20 rounds x $(nproc) concurrent"
-          for r in $(seq 1 20); do
-            pids=()
-            for j in $(seq 1 "$(nproc)"); do compile "par $r.$j" & pids+=($!); done
-            for p in "${pids[@]}"; do wait "$p" || fails=$((fails+1)); done
-            echo "par round $r done, failures so far: $fails"
+      - name: Collect core dump and binaries
+        if: failure()
+        run: |
+          shopt -s nullglob
+          cores=("$CORES"/core.*)
+          [ ${#cores[@]} -gt 0 ] || { echo "No core files"; exit 0; }
+          ls -la "$CORES"
+          TC=$(dirname "$(dirname "$RUSTC_BIN")")
+          mkdir -p dump/bin
+          cp "$TC/bin/rustc" "$TC"/lib/librustc_driver-*.so "$TC"/lib/libLLVM*.so* dump/bin/ 2>/dev/null || true
+          cp "$TC"/lib/libstd-*.so dump/bin/ 2>/dev/null || true
+          for c in "${cores[@]}"; do
+            exe=$(file "$c" | sed -n "s/.*execfn: '\([^']*\)'.*/\1/p")
+            echo "== $c ($exe)"
+            gdb -q -batch -nx -ex 'set pagination off' -ex 'info sharedlibrary' -ex 'thread apply all bt' \
+              "${exe:-$RUSTC_BIN}" "$c" > "$c.bt.txt" 2>&1 || true
+            head -c 4000 "$c.bt.txt"
+            zstd -q -T0 -19 "$c" -o "dump/$(basename "$c").zst"; cp "$c.bt.txt" dump/
           done
+          cp "$CORES"/*.log dump/ 2>/dev/null || true
+          (cd dump/bin && for f in *; do echo "$f $(readelf -n "$f" | awk '/Build ID/{print $3}')"; done) > dump/build-ids.txt
+          { hostname; uname -a; rustc -vV; ldd --version | head -1; } > dump/machine.txt
+          du -sh dump/* dump/bin/*
 
-          echo "Total failures: $fails"
-          [ "$fails" -eq 0 ]
+      - name: Upload core dump
+        if: failure()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: rustc-crash-dump
+          path: dump/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Kernel log
         if: always()
