@@ -132,14 +132,13 @@ jobs:
           ulimit -c unlimited
           i=0
           while true; do
-            i=$((i+1)); echo "## Full build $i ($(date -u +%H:%M:%S))"
+            i=$((i+1)); rc=0; echo "## Full build $i ($(date -u +%H:%M:%S))"
             env -i PATH="$HOME/.cargo/bin:/usr/bin:/bin" HOME="$HOME" CARGO_HOME="$CARGO_HOME" \
               RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" RUSTUP_TOOLCHAIN="$RUST_VERSION" CARGO_TERM_COLOR=never \
               bash -c 'cargo clippy --workspace --locked -- -Dwarnings && cargo build --profile ci --workspace --locked' \
-              > "$RUNNER_TEMP/build.log" 2>&1
-            rc=$?
+              > "$RUNNER_TEMP/build.log" 2>&1 || rc=$?
             if [ $rc -ne 0 ] || ls "$CORES"/core.* >/dev/null 2>&1; then
-              echo "::error::full build $i failed (rc $rc)"; grep -B2 -A6 -E 'error|signal|corrupt' "$RUNNER_TEMP/build.log" | tail -60
+              echo "::error::full build $i failed (rc $rc)"; tail -c 6000 "$RUNNER_TEMP/build.log"
               cp "$RUNNER_TEMP/build.log" "$CORES/"; exit 1
             fi
             cargo clean
@@ -150,6 +149,8 @@ jobs:
         run: |
           shopt -s nullglob
           cores=("$CORES"/core.*)
+          mkdir -p dump
+          cp "$CORES"/*.log dump/ 2>/dev/null || true
           [ ${#cores[@]} -gt 0 ] || { echo "No core files"; exit 0; }
           ls -la "$CORES"
           TC=$(dirname "$(dirname "$RUSTC_BIN")")
