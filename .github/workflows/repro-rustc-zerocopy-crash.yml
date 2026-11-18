@@ -3,7 +3,7 @@ name: repro-rustc-zerocopy-crash
 # Throwaway: reproduce the rustc SIGABRT ("corrupted double-linked list") seen while
 # compiling zerocopy 0.8.63 in run 43842725611 attempt 1 (riscv-runner-36), and keep
 # a core dump of it. Phase 1 replays the exact rustc call in a loop, alone and under
-# parallel load. Phase 2 repeats the full workspace build, where the crash first hit.
+# parallel load. Phase 2 repeats clippy then the full build, as in the job where it first hit.
 # Every compiler process runs with a scrubbed environment, so cores carry no CI tokens.
 
 on:
@@ -74,14 +74,14 @@ jobs:
       - name: "Phase 1: replay rustc on zerocopy"
         id: phase1
         working-directory: nym-vpn-core
-        timeout-minutes: 120
+        timeout-minutes: 40
         run: |
           set -u
           SRC=$(ls -d "$CARGO_HOME"/registry/src/index.crates.io-*/zerocopy-0.8.63 | head -1)
           RUSTC=$(rustup which rustc)
           echo "rustc: $RUSTC"; echo "src: $SRC"; echo "RUSTC_BIN=$RUSTC" >> "$GITHUB_ENV"
           ulimit -c unlimited
-          deadline=$(( $(date +%s) + 100*60 ))
+          deadline=$(( $(date +%s) + 20*60 ))
 
           compile() {
             out=$(mktemp -d)
@@ -135,13 +135,14 @@ jobs:
             i=$((i+1)); echo "## Full build $i ($(date -u +%H:%M:%S))"
             env -i PATH="$HOME/.cargo/bin:/usr/bin:/bin" HOME="$HOME" CARGO_HOME="$CARGO_HOME" \
               RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" RUSTUP_TOOLCHAIN="$RUST_VERSION" CARGO_TERM_COLOR=never \
-              cargo build --profile ci --workspace --locked > "$RUNNER_TEMP/build.log" 2>&1
+              bash -c 'cargo clippy --workspace --locked -- -Dwarnings && cargo build --profile ci --workspace --locked' \
+              > "$RUNNER_TEMP/build.log" 2>&1
             rc=$?
             if [ $rc -ne 0 ] || ls "$CORES"/core.* >/dev/null 2>&1; then
               echo "::error::full build $i failed (rc $rc)"; grep -B2 -A6 -E 'error|signal|corrupt' "$RUNNER_TEMP/build.log" | tail -60
               cp "$RUNNER_TEMP/build.log" "$CORES/"; exit 1
             fi
-            cargo clean --profile ci
+            cargo clean
           done
 
       - name: Collect core dump and binaries
