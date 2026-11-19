@@ -2,8 +2,8 @@ name: repro-rustc-zerocopy-crash
 
 # Throwaway: reproduce the rustc SIGABRT ("corrupted double-linked list") seen while
 # compiling zerocopy 0.8.63 in run 43842725611 attempt 1 (riscv-runner-36), and keep
-# a core dump of it. Phase 1 replays the exact rustc call in a loop, alone and under
-# parallel load. Phase 2 repeats clippy then the full build, as in the job where it first hit.
+# a core dump of it. Repeats clippy then the full build, as in the job where it first hit.
+# (A replay of the exact rustc call on zerocopy ran ~80 times without a crash, so it was dropped.)
 # Every compiler process runs with a scrubbed environment, so cores carry no CI tokens.
 
 on:
@@ -49,6 +49,7 @@ jobs:
           rustc -vV
           ldd --version | head -1
           cat /proc/sys/kernel/core_pattern
+          echo "RUSTC_BIN=$(rustup which rustc)" >> "$GITHUB_ENV"
 
       - name: Set up core dumps
         run: |
@@ -56,14 +57,13 @@ jobs:
           echo "CORES=$CORES" >> "$GITHUB_ENV"
           sudo sysctl -w kernel.core_pattern="$CORES/core.%e.%p.%t" || true
           echo "core_pattern: $(cat /proc/sys/kernel/core_pattern)"
-          # Self-test: an aborted process must leave a core, or phase 1 falls back to gdb
+          # Self-test: an aborted process must leave a core, or the run fails early
           (ulimit -c unlimited; sleep 60 & p=$!; sleep 1; kill -ABRT $p; wait $p) || true
           sleep 2
           if ls "$CORES"/core.sleep.* >/dev/null 2>&1; then
-            echo "Kernel core dumps work"; echo "KERNEL_CORES=1" >> "$GITHUB_ENV"
+            echo "Kernel core dumps work"
           else
-            echo "::warning::No kernel core dump; phase 1 runs rustc under gdb, phase 2 is skipped"
-            echo "KERNEL_CORES=0" >> "$GITHUB_ENV"
+            echo "::error::No kernel core dump, a crash would leave nothing to collect"; exit 1
           fi
           rm -f "$CORES"/core.sleep.*
 
@@ -72,61 +72,7 @@ jobs:
           (cd nym-vpn-core && cargo fetch --locked)
           ./wireguard/build-wireguard-go.sh
 
-      - name: "Phase 1: replay rustc on zerocopy"
-        id: phase1
-        working-directory: nym-vpn-core
-        timeout-minutes: 40
-        run: |
-          set -u
-          SRC=$(ls -d "$CARGO_HOME"/registry/src/index.crates.io-*/zerocopy-0.8.63 | head -1)
-          RUSTC=$(rustup which rustc)
-          echo "rustc: $RUSTC"; echo "src: $SRC"; echo "RUSTC_BIN=$RUSTC" >> "$GITHUB_ENV"
-          ulimit -c unlimited
-          deadline=$(( $(date +%s) + 20*60 ))
-
-          compile() {
-            out=$(mktemp -d)
-            # Scrubbed env: only what rustc needs, so a core holds no secrets
-            set -- env -i PATH=/usr/bin:/bin HOME=/tmp CARGO_PKG_NAME=zerocopy CARGO_PKG_VERSION=0.8.63 \
-              CARGO_CRATE_NAME=zerocopy CARGO_MANIFEST_DIR="$SRC" \
-              "$RUSTC" --crate-name zerocopy --edition=2021 "$SRC/src/lib.rs" \
-              --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat \
-              --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no \
-              --cfg 'feature="simd"' -C metadata=17e749fc1d1d6ea3 -C extra-filename=-e06e5827b5303255 \
-              --out-dir "$out" -C strip=debuginfo --cap-lints allow
-            if [ "$KERNEL_CORES" = 1 ]; then
-              "$@" >"$out/log" 2>&1; rc=$?
-            else
-              gdb -q -batch -nx -return-child-result -ex 'set pagination off' -ex run \
-                -ex "generate-core-file $CORES/core.rustc.gdb.$$.$RANDOM" -ex 'thread apply all bt' \
-                --args "$@" >"$out/log" 2>&1; rc=$?
-              grep -q 'received signal' "$out/log" || rc=0
-              [ $rc -eq 0 ] && rm -f "$CORES"/core.rustc.gdb.*
-            fi
-            if [ $rc -ne 0 ]; then echo "::error::rustc exited $rc"; tail -c 6000 "$out/log"; cp "$out/log" "$CORES/" || true; fi
-            rm -rf "$out"
-            return $rc
-          }
-
-          n=0
-          while [ "$(date +%s)" -lt "$deadline" ]; do
-            n=$((n+1))
-            compile || break
-            if [ $((n % 5)) -eq 0 ]; then
-              # Parallel round: one compile per core at once
-              pids=(); for j in $(seq 1 "$(nproc)"); do compile & pids+=($!); done
-              for p in "${pids[@]}"; do wait "$p" || touch "$RUNNER_TEMP/phase1-failed"; done
-              [ -e "$RUNNER_TEMP/phase1-failed" ] && break
-            fi
-            echo "iteration $n ok ($(date -u +%H:%M:%S))"
-          done
-          if ls "$CORES"/core.* >/dev/null 2>&1 || [ -e "$RUNNER_TEMP/phase1-failed" ] || [ "$(date +%s)" -lt "$deadline" ]; then
-            echo "Phase 1 stopped on a failure after $n iterations"; echo "crashed=1" >> "$GITHUB_OUTPUT"; exit 1
-          fi
-          echo "Phase 1: no crash in $n iterations"
-
-      - name: "Phase 2: repeat the full workspace build"
-        if: steps.phase1.outputs.crashed != '1' && env.KERNEL_CORES == '1'
+      - name: "Repeat the full workspace build"
         working-directory: nym-vpn-core
         run: |
           set -u
