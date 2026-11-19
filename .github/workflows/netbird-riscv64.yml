@@ -1,0 +1,105 @@
+name: netbird-riscv64
+
+# Native linux/riscv64 build and test on the RISE RISC-V runners (https://ci.riseproject.dev/).
+# Scratch branch: runs netbird's riscv64 build from this repo because the RISE app
+# could not be installed on the netbird fork.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/netbird-riscv64
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  riscv64:
+    name: Build and test (riscv64)
+    runs-on: ubuntu-24.04-riscv
+    # The runners are 4-core boards; a cold Go build of netbird is slow there.
+    timeout-minutes: 300
+    steps:
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git curl libpcap-dev iptables nftables file time
+
+      - name: Checkout netbird
+        uses: actions/checkout@v5
+        with:
+          repository: netbirdio/netbird
+          ref: 72d4da4ae8b304291cb3201a4f7dde54380bb3e8
+          persist-credentials: false
+
+      # actions/setup-go has no riscv64 builds in its manifest; take the official tarball.
+      - name: Install Go
+        run: |
+          GOVER=$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -1)
+          GOMOD=$(awk '/^go /{print $2}' go.mod)
+          echo "latest=$GOVER go.mod=$GOMOD"
+          curl -fsSL "https://go.dev/dl/${GOVER}.linux-riscv64.tar.gz" | sudo tar -C /usr/local -xz
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Machine info
+        run: |
+          uname -a
+          nproc
+          free -h
+          grep -m1 -E '^(isa|uarch)' /proc/cpuinfo || true
+          go version
+          go env GOARCH GOOS
+
+      - name: Build client (static)
+        working-directory: client
+        run: /usr/bin/time -v env CGO_ENABLED=0 go build -o netbird-static .
+
+      - name: Build client (cgo)
+        working-directory: client
+        run: /usr/bin/time -v env CGO_ENABLED=1 go build -o netbird .
+
+      - name: Build management
+        working-directory: management
+        run: /usr/bin/time -v env CGO_ENABLED=1 go build -o netbird-mgmt .
+
+      - name: Build signal
+        working-directory: signal
+        run: CGO_ENABLED=0 go build -o netbird-signal .
+
+      - name: Build relay
+        working-directory: relay
+        run: CGO_ENABLED=0 go build -o netbird-relay .
+
+      - name: Smoke test binaries
+        run: |
+          file client/netbird client/netbird-static management/netbird-mgmt signal/netbird-signal relay/netbird-relay
+          client/netbird version
+          client/netbird-static version
+          management/netbird-mgmt --help | head -5
+          signal/netbird-signal --help | head -5
+
+      - name: Unit tests (portable packages)
+        run: |
+          go test -count=1 -timeout 60m -tags devcert \
+            ./encryption/... ./relay/... ./signal/... ./shared/... \
+            ./client/internal/peer/... ./client/iface/... ./client/firewall/uspfilter/...
+
+      - name: Unit tests (client, host-safe, no sudo)
+        continue-on-error: true
+        run: |
+          go test -count=1 -p 2 -timeout 120m -tags devcert \
+            $(go list ./client/... | grep -v -e /client/ui -e /client/android -e /client/ios -e /client/wasm)
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: netbird-linux-riscv64
+          path: |
+            client/netbird
+            client/netbird-static
+            management/netbird-mgmt
+            signal/netbird-signal
+            relay/netbird-relay
+          retention-days: 7
