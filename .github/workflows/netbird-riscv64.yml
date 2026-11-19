@@ -6,6 +6,11 @@ name: netbird-riscv64
 
 on:
   workflow_dispatch:
+    inputs:
+      tests_only:
+        description: Skip the builds and run only the unit tests
+        type: boolean
+        default: false
   push:
     branches:
       - ci/netbird-riscv64
@@ -54,30 +59,36 @@ jobs:
           go env GOARCH GOOS
 
       - name: Build client (static)
+        if: ${{ !inputs.tests_only }}
         working-directory: client
         run: /usr/bin/time -v env CGO_ENABLED=0 go build -o netbird-static .
 
       # Hung with no output for 80 min on riscv-runner-28 with go1.27.4; capped and verbose.
       - name: Build client (cgo)
+        if: ${{ !inputs.tests_only }}
         working-directory: client
         timeout-minutes: 30
         continue-on-error: true
         run: set -o pipefail; /usr/bin/time -v env CGO_ENABLED=1 go build -v -o netbird . 2>&1 | ts -s '%.s'
 
       - name: Build management
+        if: ${{ !inputs.tests_only }}
         working-directory: management
         timeout-minutes: 60
         run: set -o pipefail; /usr/bin/time -v env CGO_ENABLED=1 go build -v -o netbird-mgmt . 2>&1 | ts -s '%.s'
 
       - name: Build signal
+        if: ${{ !inputs.tests_only }}
         working-directory: signal
         run: CGO_ENABLED=0 go build -o netbird-signal .
 
       - name: Build relay
+        if: ${{ !inputs.tests_only }}
         working-directory: relay
         run: CGO_ENABLED=0 go build -o netbird-relay .
 
       - name: Smoke test binaries
+        if: ${{ !inputs.tests_only }}
         run: |
           file client/netbird-static management/netbird-mgmt signal/netbird-signal relay/netbird-relay
           [ -x client/netbird ] && client/netbird version || echo "cgo client not built"
@@ -88,6 +99,7 @@ jobs:
       # shared/relay/client TestBindReconnect races under load on any arch (9/40 on loaded
       # amd64); report but keep going so the client tests still run.
       - name: Unit tests (portable packages)
+        if: ${{ !inputs.tests_only }}
         continue-on-error: true
         run: |
           go test -count=1 -timeout 60m -tags devcert \
@@ -98,10 +110,10 @@ jobs:
         continue-on-error: true
         run: |
           go test -count=1 -p 2 -timeout 120m -tags devcert \
-            $(go list ./client/... | grep -v -e /client/ui -e /client/android -e /client/ios -e /client/wasm)
+            $(go list -e ./client/... | grep -v -e /client/ui -e /client/android -e /client/ios -e /client/wasm)
 
       - name: Upload binaries
-        if: always()
+        if: ${{ always() && !inputs.tests_only }}
         uses: actions/upload-artifact@v4
         with:
           name: netbird-linux-riscv64
