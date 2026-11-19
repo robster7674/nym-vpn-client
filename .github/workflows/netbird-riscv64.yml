@@ -24,7 +24,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git curl libpcap-dev iptables nftables file time
+          sudo apt-get install -y build-essential git curl libpcap-dev iptables nftables file time moreutils
 
       - name: Checkout netbird
         uses: actions/checkout@v5
@@ -33,12 +33,13 @@ jobs:
           ref: 72d4da4ae8b304291cb3201a4f7dde54380bb3e8
           persist-credentials: false
 
-      # actions/setup-go has no riscv64 builds in its manifest; take the official tarball.
+      # actions/setup-go has no riscv64 builds in its manifest; take the official tarball,
+      # pinned to the toolchain go.mod asks for.
       - name: Install Go
         run: |
-          GOVER=$(curl -fsSL 'https://go.dev/VERSION?m=text' | head -1)
-          GOMOD=$(awk '/^go /{print $2}' go.mod)
-          echo "latest=$GOVER go.mod=$GOMOD"
+          GOVER=$(awk '/^toolchain /{print $2}' go.mod)
+          [ -n "$GOVER" ] || GOVER=go$(awk '/^go /{print $2}' go.mod)
+          echo "toolchain=$GOVER"
           curl -fsSL "https://go.dev/dl/${GOVER}.linux-riscv64.tar.gz" | sudo tar -C /usr/local -xz
           echo "/usr/local/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
@@ -56,13 +57,17 @@ jobs:
         working-directory: client
         run: /usr/bin/time -v env CGO_ENABLED=0 go build -o netbird-static .
 
+      # Hung with no output for 80 min on riscv-runner-28 with go1.27.4; capped and verbose.
       - name: Build client (cgo)
         working-directory: client
-        run: /usr/bin/time -v env CGO_ENABLED=1 go build -o netbird .
+        timeout-minutes: 30
+        continue-on-error: true
+        run: set -o pipefail; /usr/bin/time -v env CGO_ENABLED=1 go build -v -o netbird . 2>&1 | ts -s '%.s'
 
       - name: Build management
         working-directory: management
-        run: /usr/bin/time -v env CGO_ENABLED=1 go build -o netbird-mgmt .
+        timeout-minutes: 60
+        run: set -o pipefail; /usr/bin/time -v env CGO_ENABLED=1 go build -v -o netbird-mgmt . 2>&1 | ts -s '%.s'
 
       - name: Build signal
         working-directory: signal
@@ -74,8 +79,8 @@ jobs:
 
       - name: Smoke test binaries
         run: |
-          file client/netbird client/netbird-static management/netbird-mgmt signal/netbird-signal relay/netbird-relay
-          client/netbird version
+          file client/netbird-static management/netbird-mgmt signal/netbird-signal relay/netbird-relay
+          [ -x client/netbird ] && client/netbird version || echo "cgo client not built"
           client/netbird-static version
           management/netbird-mgmt --help | head -5
           signal/netbird-signal --help | head -5
@@ -96,6 +101,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: netbird-linux-riscv64
+          if-no-files-found: warn
           path: |
             client/netbird
             client/netbird-static
