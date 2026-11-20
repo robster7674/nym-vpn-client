@@ -8,6 +8,9 @@ concurrency:
   cancel-in-progress: false
   queue: max
 
+permissions:
+  contents: read
+
 jobs:
   crowdin-download:
     runs-on: arc-linux-latest-dind

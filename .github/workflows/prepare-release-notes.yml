@@ -190,6 +190,31 @@ jobs:
     steps:
       - name: Resolve runtime parameters
         id: set-params
+        # Inputs go through env so they are never interpolated as shell code
+        env:
+          IN_GITHUB_RELEASE_TYPE: ${{ inputs.github_release_type }}
+          IN_VERSION: ${{ inputs.version }}
+          IN_ANDROID: ${{ inputs.android }}
+          IN_FDROID: ${{ inputs.fdroid }}
+          IN_LINUX: ${{ inputs.linux }}
+          IN_WINDOWS: ${{ inputs.windows }}
+          IN_MACOS: ${{ inputs.macos }}
+          IN_IOS: ${{ inputs.ios }}
+          IN_ANDROID_APK: ${{ inputs.android_apk }}
+          IN_VPND_DEB_X86_64: ${{ inputs.vpnd_deb_x86_64 }}
+          IN_VPND_DEB_AARCH64: ${{ inputs.vpnd_deb_aarch64 }}
+          IN_VPNC_DEB_X86_64: ${{ inputs.vpnc_deb_x86_64 }}
+          IN_VPNC_DEB_AARCH64: ${{ inputs.vpnc_deb_aarch64 }}
+          IN_NM_PLUGIN_DEB_X86_64: ${{ inputs.nm_plugin_deb_x86_64 }}
+          IN_NM_PLUGIN_DEB_AARCH64: ${{ inputs.nm_plugin_deb_aarch64 }}
+          IN_LINUX_APP_DEB_X64: ${{ inputs.linux_app_deb_x64 }}
+          IN_LINUX_APP_DEB_ARM64: ${{ inputs.linux_app_deb_arm64 }}
+          IN_LINUX_APP_APPIMAGE_X64: ${{ inputs.linux_app_appimage_x64 }}
+          IN_LINUX_APP_APPIMAGE_ARM64: ${{ inputs.linux_app_appimage_arm64 }}
+          IN_MACOS_INSTALLER_NAME: ${{ inputs.macos_installer_name }}
+          IN_VPNC_MACOS_INSTALLER_NAME: ${{ inputs.vpnc_macos_installer_name }}
+          IN_WINDOWS_APP_INSTALLER_X64: ${{ inputs.windows_app_installer_x64 }}
+          IN_WINDOWS_APP_INSTALLER_ARM64: ${{ inputs.windows_app_installer_arm64 }}
         run: |
           IS_PR="${{ github.event_name == 'pull_request' }}"
 
@@ -220,30 +245,30 @@ jobs:
             echo "windows_app_installer_x64=app_x64.exe" >> $GITHUB_OUTPUT
             echo "windows_app_installer_arm64=app_arm64.exe" >> $GITHUB_OUTPUT
           else
-            echo "github_release_type=${{ inputs.github_release_type }}" >> $GITHUB_OUTPUT
-            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
-            echo "android=${{ inputs.android }}" >> $GITHUB_OUTPUT
-            echo "fdroid=${{ inputs.fdroid }}" >> $GITHUB_OUTPUT
-            echo "linux=${{ inputs.linux }}" >> $GITHUB_OUTPUT
-            echo "windows=${{ inputs.windows }}" >> $GITHUB_OUTPUT
-            echo "macos=${{ inputs.macos }}" >> $GITHUB_OUTPUT
-            echo "ios=${{ inputs.ios }}" >> $GITHUB_OUTPUT
+            echo "github_release_type=${IN_GITHUB_RELEASE_TYPE}" >> $GITHUB_OUTPUT
+            echo "version=${IN_VERSION}" >> $GITHUB_OUTPUT
+            echo "android=${IN_ANDROID}" >> $GITHUB_OUTPUT
+            echo "fdroid=${IN_FDROID}" >> $GITHUB_OUTPUT
+            echo "linux=${IN_LINUX}" >> $GITHUB_OUTPUT
+            echo "windows=${IN_WINDOWS}" >> $GITHUB_OUTPUT
+            echo "macos=${IN_MACOS}" >> $GITHUB_OUTPUT
+            echo "ios=${IN_IOS}" >> $GITHUB_OUTPUT
 
-            echo "android_apk=${{ inputs.android_apk || '' }}" >> $GITHUB_OUTPUT
-            echo "vpnd_deb_x86_64=${{ inputs.vpnd_deb_x86_64 || '' }}" >> $GITHUB_OUTPUT
-            echo "vpnd_deb_aarch64=${{ inputs.vpnd_deb_aarch64 || '' }}" >> $GITHUB_OUTPUT
-            echo "vpnc_deb_x86_64=${{ inputs.vpnc_deb_x86_64 || '' }}" >> $GITHUB_OUTPUT
-            echo "vpnc_deb_aarch64=${{ inputs.vpnc_deb_aarch64 || '' }}" >> $GITHUB_OUTPUT
-            echo "nm_plugin_deb_x86_64=${{ inputs.nm_plugin_deb_x86_64 || '' }}" >> $GITHUB_OUTPUT
-            echo "nm_plugin_deb_aarch64=${{ inputs.nm_plugin_deb_aarch64 || '' }}" >> $GITHUB_OUTPUT
-            echo "linux_app_deb_x64=${{ inputs.linux_app_deb_x64 || '' }}" >> $GITHUB_OUTPUT
-            echo "linux_app_deb_arm64=${{ inputs.linux_app_deb_arm64 || '' }}" >> $GITHUB_OUTPUT
-            echo "linux_app_appimage_x64=${{ inputs.linux_app_appimage_x64 || '' }}" >> $GITHUB_OUTPUT
-            echo "linux_app_appimage_arm64=${{ inputs.linux_app_appimage_arm64 || '' }}" >> $GITHUB_OUTPUT
-            echo "macos_installer_name=${{ inputs.macos_installer_name || '' }}" >> $GITHUB_OUTPUT
-            echo "vpnc_macos_installer_name=${{ inputs.vpnc_macos_installer_name || '' }}" >> $GITHUB_OUTPUT
-            echo "windows_app_installer_x64=${{ inputs.windows_app_installer_x64 || '' }}" >> $GITHUB_OUTPUT
-            echo "windows_app_installer_arm64=${{ inputs.windows_app_installer_arm64 || '' }}" >> $GITHUB_OUTPUT
+            echo "android_apk=${IN_ANDROID_APK}" >> $GITHUB_OUTPUT
+            echo "vpnd_deb_x86_64=${IN_VPND_DEB_X86_64}" >> $GITHUB_OUTPUT
+            echo "vpnd_deb_aarch64=${IN_VPND_DEB_AARCH64}" >> $GITHUB_OUTPUT
+            echo "vpnc_deb_x86_64=${IN_VPNC_DEB_X86_64}" >> $GITHUB_OUTPUT
+            echo "vpnc_deb_aarch64=${IN_VPNC_DEB_AARCH64}" >> $GITHUB_OUTPUT
+            echo "nm_plugin_deb_x86_64=${IN_NM_PLUGIN_DEB_X86_64}" >> $GITHUB_OUTPUT
+            echo "nm_plugin_deb_aarch64=${IN_NM_PLUGIN_DEB_AARCH64}" >> $GITHUB_OUTPUT
+            echo "linux_app_deb_x64=${IN_LINUX_APP_DEB_X64}" >> $GITHUB_OUTPUT
+            echo "linux_app_deb_arm64=${IN_LINUX_APP_DEB_ARM64}" >> $GITHUB_OUTPUT
+            echo "linux_app_appimage_x64=${IN_LINUX_APP_APPIMAGE_X64}" >> $GITHUB_OUTPUT
+            echo "linux_app_appimage_arm64=${IN_LINUX_APP_APPIMAGE_ARM64}" >> $GITHUB_OUTPUT
+            echo "macos_installer_name=${IN_MACOS_INSTALLER_NAME}" >> $GITHUB_OUTPUT
+            echo "vpnc_macos_installer_name=${IN_VPNC_MACOS_INSTALLER_NAME}" >> $GITHUB_OUTPUT
+            echo "windows_app_installer_x64=${IN_WINDOWS_APP_INSTALLER_X64}" >> $GITHUB_OUTPUT
+            echo "windows_app_installer_arm64=${IN_WINDOWS_APP_INSTALLER_ARM64}" >> $GITHUB_OUTPUT
           fi
 
   prepare-release-notes:

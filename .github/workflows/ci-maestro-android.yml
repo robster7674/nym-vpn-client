@@ -10,6 +10,9 @@ on:
 env:
   UI_SCRIPTS_DIR: .github/scripts/ui
 
+permissions:
+  contents: read
+
 jobs:
   maestro-ui-tests:
     runs-on: ubuntu-latest

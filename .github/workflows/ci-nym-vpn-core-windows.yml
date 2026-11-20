@@ -18,6 +18,9 @@ env:
   WINFW_PATH: build/winfw/x64-Debug
   STDRIVER_PATH: build/st-driver/x64-Debug
 
+permissions:
+  contents: read
+
 jobs:
   build-wireguard-go-windows:
     uses: ./.github/workflows/build-wireguard-go-windows.yml

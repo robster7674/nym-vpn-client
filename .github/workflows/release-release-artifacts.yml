@@ -133,6 +133,9 @@ env:
   S3_ENDPOINT: https://s3.nymte.ch # API endpoint for uploads
   S3_BUCKET: builds
 
+permissions:
+  contents: read
+
 jobs:
   resolve:
     runs-on: arc-linux-latest
@@ -166,17 +169,17 @@ jobs:
 
       - name: Resolve
         id: resolve
+        env:
+          TAG: ${{ inputs.tag }}
+          GITHUB_RELEASE_TYPE: ${{ inputs.github_release_type }}
+          VERSION: ${{ inputs.version }}
+          ANDROID: ${{ inputs.android }}
+          FDROID: ${{ inputs.fdroid }}
+          LINUX: ${{ inputs.linux }}
+          WINDOWS: ${{ inputs.windows }}
+          IOS: ${{ inputs.ios }}
+          MACOS: ${{ inputs.macos }}
         run: |
-          TAG="${{ inputs.tag }}"
-          GITHUB_RELEASE_TYPE="${{ inputs.github_release_type }}"
-          VERSION="${{ inputs.version }}"
-          ANDROID="${{ inputs.android }}"
-          FDROID="${{ inputs.fdroid }}"
-          LINUX="${{ inputs.linux }}"
-          WINDOWS="${{ inputs.windows }}"
-          IOS="${{ inputs.ios }}"
-          MACOS="${{ inputs.macos }}"
-
           if [[ $GITHUB_RELEASE_TYPE != 'draft' && $GITHUB_RELEASE_TYPE != 'prerelease' && $GITHUB_RELEASE_TYPE != 'release' ]]; then
             echo "Github release type is not supported: $GITHUB_RELEASE_TYPE"
             exit 1

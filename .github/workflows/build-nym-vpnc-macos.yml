@@ -45,6 +45,9 @@ env:
   CORE_ARTIFACTS_MACOS: core_artifacts_macos
   UPLOAD_DIR_MACOS: vpnc_macos_artifacts
 
+permissions:
+  contents: read
+
 jobs:
   build-nym-vpnc-macos:
     if: github.actor != 'dependabot[bot]'

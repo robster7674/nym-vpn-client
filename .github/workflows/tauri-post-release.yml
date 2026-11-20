@@ -41,6 +41,9 @@ env:
   GIT_USER: NYM CI
   GIT_EMAIL: ci@nymtech.net
 
+permissions:
+  contents: read
+
 jobs:
   post-release:
     runs-on: arc-linux-latest

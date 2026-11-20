@@ -49,6 +49,9 @@ on:
         required: true
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   update-metadata:
     runs-on: arc-linux-latest
@@ -65,22 +68,31 @@ jobs:
           ref: "develop"
 
       - name: Install yq
+        env:
+          YQ_VERSION: v4.54.1
+          YQ_SHA256: 8e34fc298390875de416e6a4afcb8cabeceb25d9aa8506c1a2f9353cf702ea5f
         run: |
-          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
-          sudo chmod +x /usr/bin/yq
+          wget -q "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -O yq
+          echo "${YQ_SHA256}  yq" | sha256sum -c -
+          sudo install -m 0755 yq /usr/bin/yq
 
       - name: Update metadata (${{ inputs.channel }})
         working-directory: .pkg/tauri-updater
+        env:
+          VERSION: ${{ inputs.version }}
+          BASE_URL: ${{ inputs.base_url }}
+          SIGNATURE_X64: ${{ inputs.signature_x64 }}
+          SIGNATURE_ARM64: ${{ inputs.signature_arm64 }}
         run: |
           yq -i '
-            .version = "${{ inputs.version }}" |
-            .platforms."windows-x86_64".url = "${{ inputs.base_url }}/NymVPN_${{ inputs.version }}_x64-setup.exe" |
-            .platforms."windows-x86_64".signature = "${{ inputs.signature_x64 }}" |
-            .platforms."windows-aarch64".url = "${{ inputs.base_url }}/NymVPN_${{ inputs.version }}_arm64-setup.exe" |
-            .platforms."windows-aarch64".signature = "${{ inputs.signature_arm64 }}"
-          ' ${{ env.JSON_FILE }}
+            .version = strenv(VERSION) |
+            .platforms."windows-x86_64".url = strenv(BASE_URL) + "/NymVPN_" + strenv(VERSION) + "_x64-setup.exe" |
+            .platforms."windows-x86_64".signature = strenv(SIGNATURE_X64) |
+            .platforms."windows-aarch64".url = strenv(BASE_URL) + "/NymVPN_" + strenv(VERSION) + "_arm64-setup.exe" |
+            .platforms."windows-aarch64".signature = strenv(SIGNATURE_ARM64)
+          ' "$JSON_FILE"
           echo "updated metadata"
-          cat ${{ env.JSON_FILE }}
+          cat "$JSON_FILE"
 
       - name: Create PR
         env:

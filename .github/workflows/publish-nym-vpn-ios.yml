@@ -29,6 +29,9 @@ env:
   CARGO_TERM_COLOR: always
   UPLOAD_DIR_IOS: ios_artifacts
 
+permissions:
+  contents: read
+
 jobs:
   publish-testflight:
     runs-on: custom-macos-15

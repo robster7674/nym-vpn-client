@@ -19,6 +19,9 @@ on:
 env:
   HOMEBREW_NO_ANALYTICS: 1
 
+permissions:
+  contents: read
+
 jobs:
   macos-updater:
     runs-on: custom-macos-15

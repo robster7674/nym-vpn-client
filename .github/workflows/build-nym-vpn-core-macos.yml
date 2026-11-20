@@ -22,6 +22,9 @@ env:
   CORE_ARTIFACTS_MACOS_X86_64: core_artifacts_macos_x86_64
   CORE_ARTIFACTS_MACOS_ARM64: core_artifacts_macos_arm64
 
+permissions:
+  contents: read
+
 jobs:
   build-wireguard-go-macos:
     uses: ./.github/workflows/build-wireguard-go-mac.yml

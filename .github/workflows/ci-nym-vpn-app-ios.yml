@@ -12,6 +12,9 @@ env:
   HOMEBREW_NO_ANALYTICS: 1
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 jobs:
   build:
     if: github.actor != 'dependabot[bot]'
