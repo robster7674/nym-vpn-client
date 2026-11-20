@@ -1,8 +1,10 @@
 name: ci-nym-vpn-core-linux-riscv64
 
-# Native riscv64 build on the RISE RISC-V runners (https://ci.riseproject.dev/).
-# Needs the RISE GitHub App installed on the repo, otherwise the job stays queued,
-# so PR runs are gated on the RISCV_RUNNERS repo variable being "true".
+# Native riscv64 build on free RISC-V runners:
+# - RISE (https://ci.riseproject.dev/): Scaleway EM-RV1 nodes
+# - Cloud-V (https://cloud-v.co/github-riscv-runner): Milk-V Pioneer, SG2042 64 cores
+# Each needs its GitHub App installed on the repo, otherwise the job stays queued,
+# so PR and nightly runs are gated on the RISCV_RUNNERS repo variable being "true".
 
 on:
   pull_request:
@@ -14,12 +16,16 @@ on:
       - "wireguard/**"
       - ".env"
       - ".github/workflows/ci-nym-vpn-core-linux-riscv64.yml"
+  schedule:
+    - cron: "17 2 * * *"
   workflow_dispatch:
 
 env:
   CI_TESTING: true
   CARGO_TERM_COLOR: always
   AGENT_ISSELFHOSTED: 1 # https://github.com/actions/setup-go/issues/432
+  SCCACHE_VERSION: v0.19.0
+  SCCACHE_SHA256: 4283c8b336a8c14da7bf5ef46e8a596e8764f931679b6a78f76c081010ac4648
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -28,14 +34,22 @@ concurrency:
 jobs:
   build:
     if: vars.RISCV_RUNNERS == 'true' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-24.04-riscv
-    # The runners are slow (4-core TH1520) and run one job per node
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - board: rise-em-rv1
+            runs-on: '"ubuntu-24.04-riscv"'
+          - board: cloudv-pioneer
+            runs-on: '["self-hosted", "milkv-pioneer"]'
+    runs-on: ${{ fromJSON(matrix.runs-on) }}
+    # The runners are slow and ephemeral, and run one job per node
     timeout-minutes: 600
 
     steps:
       - name: Install system dependencies
         # protoc comes from apt: 3.21.12 on ubuntu 24.04, and there is no upstream riscv64 release
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev libmnl-dev libnftnl-dev protobuf-compiler git curl gcc g++ make pkg-config unzip jq libnm-dev libgtk-3-dev libgtk-4-dev
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev libmnl-dev libnftnl-dev protobuf-compiler git curl gcc g++ make pkg-config unzip jq zstd libnm-dev libgtk-3-dev libgtk-4-dev
 
       - name: Checkout repo
         uses: actions/checkout@v7.0.1
@@ -45,13 +59,23 @@ jobs:
       - name: Dotenv Action
         uses: xom9ikk/dotenv@v2.4.0
 
+      - name: Cache libwg
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: libwg-cache
+        with:
+          path: build/lib
+          # hashFiles doesn't expand {a,b} braces, so each extension is listed
+          key: libwg-riscv64-go${{ env.GOLANG_VERSION }}-${{ hashFiles('wireguard/libwg/**/*.go', 'wireguard/libwg/**/*.diff', 'wireguard/libwg/**/go.mod', 'wireguard/libwg/**/go.sum', 'wireguard/libwg/**/*.h', 'wireguard/build-wireguard-go.sh') }}
+
       - name: Install Go
+        if: steps.libwg-cache.outputs.cache-hit != 'true'
         uses: actions/setup-go@v7.0.0
         with:
           go-version: ${{ env.GOLANG_VERSION }}
           cache-dependency-path: wireguard/libwg/go.sum
 
       - name: Build wireguard
+        if: steps.libwg-cache.outputs.cache-hit != 'true'
         run: ./wireguard/build-wireguard-go.sh
 
       - name: Install rust toolchain
@@ -60,12 +84,40 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           components: clippy
 
+      - name: Install sccache
+        # mozilla-actions/sccache-action (used by setup-sccache) has no riscv64 build
+        run: |
+          name="sccache-${SCCACHE_VERSION}-riscv64gc-unknown-linux-musl"
+          curl -fsSL -o "$RUNNER_TEMP/sccache.tar.gz" "https://github.com/mozilla/sccache/releases/download/${SCCACHE_VERSION}/${name}.tar.gz"
+          echo "${SCCACHE_SHA256}  $RUNNER_TEMP/sccache.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/sccache.tar.gz" -C "$RUNNER_TEMP"
+          echo "RUSTC_WRAPPER=$RUNNER_TEMP/${name}/sccache" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/${name}" >> "$GITHUB_PATH"
+          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> "$GITHUB_ENV"
+          # Each run saves a new entry per board, so keep them well inside the 10GB repo cache quota
+          echo "SCCACHE_CACHE_SIZE=3G" >> "$GITHUB_ENV"
+          echo "SCCACHE_IDLE_TIMEOUT=0" >> "$GITHUB_ENV"
+          echo "CARGO_INCREMENTAL=0" >> "$GITHUB_ENV"
+
+      - name: Restore sccache
+        # Runners are ephemeral, so the local sccache dir round-trips through the Actions cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: sccache-cache
+        with:
+          path: ~/.cache/sccache
+          key: sccache-riscv64-${{ matrix.board }}-${{ env.RUST_VERSION }}-${{ hashFiles('nym-vpn-core/Cargo.lock') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            sccache-riscv64-${{ matrix.board }}-${{ env.RUST_VERSION }}-${{ hashFiles('nym-vpn-core/Cargo.lock') }}-
+            sccache-riscv64-${{ matrix.board }}-${{ env.RUST_VERSION }}-
+
       - name: Print toolchain info
         run: |
           uname -m
+          nproc
           rustc -vV
-          go version
+          go version || true
           protoc --version
+          sccache --version
 
       - name: Clippy
         working-directory: nym-vpn-core
@@ -87,6 +139,19 @@ jobs:
           echo "Found test binary for nym-connection-monitor: $NYM_CONNECTION_MONITOR_TESTS_BIN"
           sudo setcap 'cap_net_raw+ep' $NYM_CONNECTION_MONITOR_TESTS_BIN
 
+      - name: Save sccache
+        # Saved before the tests so a flaky test doesn't throw away the compile work.
+        # Not on cancel: a half-filled cache would become the newest restore-keys match.
+        if: ${{ !cancelled() && steps.sccache-cache.outputs.cache-primary-key != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/sccache
+          key: ${{ steps.sccache-cache.outputs.cache-primary-key }}
+
+      - name: sccache stats
+        if: ${{ !cancelled() && steps.sccache-cache.outputs.cache-primary-key != '' }}
+        run: sccache --show-stats
+
       - name: Run tests
         working-directory: nym-vpn-core
         run: |
@@ -101,7 +166,7 @@ jobs:
       - name: Upload binaries
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: nym-vpn-core_riscv64gc-unknown-linux-gnu
+          name: nym-vpn-core_riscv64gc-unknown-linux-gnu_${{ matrix.board }}
           path: |
             nym-vpn-core/target/ci/nym-vpnd
             nym-vpn-core/target/ci/nym-vpnc
