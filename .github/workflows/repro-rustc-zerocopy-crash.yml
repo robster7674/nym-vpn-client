@@ -2,7 +2,7 @@ name: repro-rustc-zerocopy-crash
 
 # Throwaway: reproduce the rustc SIGABRT ("corrupted double-linked list") seen while
 # compiling zerocopy 0.8.63 in run 43842725611 attempt 1 (riscv-runner-36), and keep
-# a core dump of it. Repeats clippy then the full build, as in the job where it first hit.
+# a core dump of it. Repeats clippy then the full build, as in the job where it first hit, two builds at a time.
 # (A replay of the exact rustc call on zerocopy ran ~80 times without a crash, so it was dropped.)
 # Every compiler process runs with a scrubbed environment, so cores carry no CI tokens.
 
@@ -45,7 +45,7 @@ jobs:
 
       - name: Machine info
         run: |
-          hostname; uname -a; nproc; free -m
+          hostname; uname -a; nproc; free -m; df -h "$RUNNER_TEMP"
           rustc -vV
           ldd --version | head -1
           cat /proc/sys/kernel/core_pattern
@@ -72,24 +72,47 @@ jobs:
           (cd nym-vpn-core && cargo fetch --locked)
           ./wireguard/build-wireguard-go.sh
 
-      - name: "Repeat the full workspace build"
+      - name: "Repeat the full workspace build, two at a time"
         working-directory: nym-vpn-core
+        env:
+          PARALLEL: 2
         run: |
           set -u
           ulimit -c unlimited
-          i=0
-          while true; do
-            i=$((i+1)); rc=0; echo "## Full build $i ($(date -u +%H:%M:%S))"
+          # One build loop per target dir, run side by side to load the 4-core, 16 GiB runner.
+          # A core file means a crash: every loop stops. A failure without a core (e.g. OOM kill)
+          # is logged and the loop goes on, unless it keeps happening.
+          cat > "$RUNNER_TEMP/build-loop.sh" <<'EOF'
+          set -u
+          n=$1; td="$RUNNER_TEMP/target-$n"; i=0; fails=0
+          while [ ! -e "$RUNNER_TEMP/stop" ]; do
+            i=$((i+1)); rc=0; echo "## Full build $n.$i ($(date -u +%H:%M:%S))"
             env -i PATH="$HOME/.cargo/bin:/usr/bin:/bin" HOME="$HOME" CARGO_HOME="$CARGO_HOME" \
               RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" RUSTUP_TOOLCHAIN="$RUST_VERSION" CARGO_TERM_COLOR=never \
+              CARGO_TARGET_DIR="$td" \
               bash -c 'cargo clippy --workspace --locked -- -Dwarnings && cargo build --profile ci --workspace --locked' \
-              > "$RUNNER_TEMP/build.log" 2>&1 || rc=$?
-            if [ $rc -ne 0 ] || ls "$CORES"/core.* >/dev/null 2>&1; then
-              echo "::error::full build $i failed (rc $rc)"; tail -c 6000 "$RUNNER_TEMP/build.log"
-              cp "$RUNNER_TEMP/build.log" "$CORES/"; exit 1
+              > "$RUNNER_TEMP/build-$n.log" 2>&1 || rc=$?
+            if ls "$CORES"/core.* >/dev/null 2>&1; then
+              echo "::error::core file found after build $n.$i (rc $rc)"; tail -c 6000 "$RUNNER_TEMP/build-$n.log"
+              cp "$RUNNER_TEMP/build-$n.log" "$CORES/build-$n.$i.log"; touch "$RUNNER_TEMP/stop"; exit 1
             fi
-            cargo clean
+            if [ $rc -ne 0 ]; then
+              fails=$((fails+1)); echo "::warning::build $n.$i failed without a core (rc $rc)"
+              tail -c 3000 "$RUNNER_TEMP/build-$n.log"; cp "$RUNNER_TEMP/build-$n.log" "$CORES/build-$n.$i.log"
+              if [ $fails -ge 3 ]; then echo "::error::loop $n failed 3 times"; touch "$RUNNER_TEMP/stop"; exit 2; fi
+            else
+              fails=0
+            fi
+            rm -rf "$td"; df -h "$RUNNER_TEMP" | tail -1
           done
+          EOF
+          pids=()
+          for n in $(seq 1 "$PARALLEL"); do
+            bash "$RUNNER_TEMP/build-loop.sh" "$n" & pids+=($!); sleep 120
+          done
+          rc=0
+          for p in "${pids[@]}"; do wait "$p" || rc=1; done
+          exit $rc
 
       - name: Collect core dump and binaries
         if: failure()
