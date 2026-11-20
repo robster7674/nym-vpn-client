@@ -8,6 +8,7 @@ on:
       - "nym-vpn-core/deny.toml"
       - "nym-vpn-app/src-tauri/Cargo.lock"
       - "nym-vpn-app/src-tauri/Cargo.toml"
+      - "nym-vpn-app/src-tauri/deny.toml"
       - ".github/workflows/ci-nym-vpn-core-cargo-deny.yml"
   schedule:
     # New RustSec advisories land against dependencies we already have
@@ -26,13 +27,22 @@ jobs:
         include:
           - name: nym-vpn-core
             manifest: ./nym-vpn-core/Cargo.toml
-            checks: advisories licenses bans sources
+            config: ./nym-vpn-core/deny.toml
+            checks: licenses bans sources
+          - name: nym-vpn-core
+            manifest: ./nym-vpn-core/Cargo.toml
+            config: ./nym-vpn-core/deny.toml
+            checks: advisories
           # The app shares crates with core but has its own lockfile; licenses
           # and bans are governed by core's policy, so only advisories here
           - name: nym-vpn-app
             manifest: ./nym-vpn-app/src-tauri/Cargo.toml
+            config: ./nym-vpn-app/src-tauri/deny.toml
             checks: advisories
-    name: cargo-deny (${{ matrix.name }})
+    name: cargo-deny (${{ matrix.name }}, ${{ matrix.checks }})
+    # A newly published advisory shouldn't fail unrelated PRs; the scheduled
+    # run is what reports it
+    continue-on-error: ${{ matrix.checks == 'advisories' && github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,6 +66,7 @@ jobs:
       - name: Run cargo-deny
         env:
           MANIFEST: ${{ matrix.manifest }}
+          CONFIG: ${{ matrix.config }}
           CHECKS: ${{ matrix.checks }}
         # CHECKS is deliberately unquoted so it splits into separate checks
-        run: cargo deny --manifest-path "$MANIFEST" --config ./nym-vpn-core/deny.toml --locked --all-features check $CHECKS
+        run: cargo deny --manifest-path "$MANIFEST" --config "$CONFIG" --locked --all-features check $CHECKS
