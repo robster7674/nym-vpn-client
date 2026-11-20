@@ -69,7 +69,43 @@ feature-depth = 1
 #db-urls = ["https://github.com/rustsec/advisory-db"]
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
+# Only flag unmaintained crates we depend on directly
+unmaintained = "workspace"
+# Advisories present when the check was turned on. Shared with nym-vpn-app,
+# which is checked against this file too
 ignore = [
+    { id = "RUSTSEC-2023-0071", reason = "rsa: Marvin attack, no fixed release; baseline, tracked in #32" },
+    { id = "RUSTSEC-2025-0141", reason = "bincode unmaintained; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0098", reason = "rustls-webpki 0.101; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0099", reason = "rustls-webpki 0.101; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.101; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0258", reason = "h2 0.3; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0346", reason = "rustls; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0347", reason = "rustls 0.23; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0348", reason = "rustls 0.23; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0349", reason = "rustls; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0367", reason = "zip; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0368", reason = "zip; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0369", reason = "zip; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0381", reason = "webpki-roots; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0382", reason = "rustls-webpki; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0383", reason = "webpki-root-certs; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0385", reason = "ctutils; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0391", reason = "zstd; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0398", reason = "zstd-safe; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0403", reason = "zstd-safe; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0410", reason = "zstd-sys; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0414", reason = "pulldown-cmark; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0418", reason = "libz-sys; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0429", reason = "zip; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0433", reason = "pulldown-cmark; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0544", reason = "libz-sys; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0545", reason = "zip; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0546", reason = "zip; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0547", reason = "zip; baseline, tracked in #32" },
+    { id = "RUSTSEC-2026-0548", reason = "zip; baseline, tracked in #32" },
     #"RUSTSEC-0000-0000",
     #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
