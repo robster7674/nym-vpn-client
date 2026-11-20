@@ -1,0 +1,51 @@
+name: ci-trivy-wireguard
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "wireguard/**"
+      - ".github/workflows/ci-trivy-wireguard.yml"
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Kept apart from build-and-push-wg-docker so no Docker Hub secrets are in
+  # reach of the scanner (see GHSA-69fq-xp46-6x23)
+  trivy:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Run the image directly, pinned by digest, rather than trivy-action,
+      # whose tags were rewritten in that incident
+      - name: Scan wireguard Go module and Dockerfile
+        env:
+          IMAGE: ghcr.io/aquasecurity/trivy@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c # 0.76.1
+        # wireguard/ is mounted under /repo so SARIF paths come out
+        # repo-relative (wireguard/libwg/...), which code scanning needs
+        run: |
+          mkdir -p "$RUNNER_TEMP/trivy"
+          docker run --rm \
+            -v "$PWD/wireguard:/repo/wireguard:ro" \
+            -v "$RUNNER_TEMP/trivy:/out" \
+            "$IMAGE" \
+            fs --scanners vuln,misconfig \
+            --file-patterns 'dockerfile:Dockerfile_.*' \
+            --format sarif --output /out/trivy.sarif \
+            /repo
+
+      # Report-only: findings go to code scanning instead of failing the PR
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: ${{ runner.temp }}/trivy/trivy.sarif
+          category: trivy-wireguard
