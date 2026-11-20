@@ -6,13 +6,37 @@ on:
       - "nym-vpn-core/**/Cargo.lock"
       - "nym-vpn-core/**/Cargo.toml"
       - "nym-vpn-core/deny.toml"
+      - "nym-vpn-app/src-tauri/Cargo.lock"
+      - "nym-vpn-app/src-tauri/Cargo.toml"
       - ".github/workflows/ci-nym-vpn-core-cargo-deny.yml"
+  schedule:
+    # New RustSec advisories land against dependencies we already have
+    - cron: "17 5 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   cargo-deny:
-    runs-on: arc-linux-latest
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: nym-vpn-core
+            manifest: ./nym-vpn-core/Cargo.toml
+            checks: advisories licenses bans sources
+          # The app shares crates with core but has its own lockfile; licenses
+          # and bans are governed by core's policy, so only advisories here
+          - name: nym-vpn-app
+            manifest: ./nym-vpn-app/src-tauri/Cargo.toml
+            checks: advisories
+    name: cargo-deny (${{ matrix.name }})
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Dotenv Action
         uses: xom9ikk/dotenv@d0a56edc74279820eabbe34477511327e710d0de # v2.4.0
@@ -26,6 +50,12 @@ jobs:
         uses: baptiste0928/cargo-install@8195d4f734a149db85385bb4102b42efcd373759 # v3.5.0
         with:
           crate: cargo-deny
+          version: "=0.20.2"
+          locked: true
 
       - name: Run cargo-deny
-        run: cargo deny --manifest-path ./nym-vpn-core/Cargo.toml --locked --all-features check licenses bans sources
+        env:
+          MANIFEST: ${{ matrix.manifest }}
+          CHECKS: ${{ matrix.checks }}
+        # CHECKS is deliberately unquoted so it splits into separate checks
+        run: cargo deny --manifest-path "$MANIFEST" --config ./nym-vpn-core/deny.toml --locked --all-features check $CHECKS
