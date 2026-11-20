@@ -43,8 +43,9 @@ jobs:
           cache-disabled: true
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
+          toolchain: stable
           # Android.mk cross-compiles three ABIs, so all three rust targets are needed.
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
