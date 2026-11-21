@@ -117,7 +117,7 @@ runs:
         set -euo pipefail
         export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
         dest="s3://${BUCKET}/${DESTINATION}"
-        read -ra extra_args <<< "$ARGS"
+        read -rd '' -a extra_args <<< "$ARGS" || true
         if [ -d "$SRC" ]; then
           aws s3 sync "$SRC" "$dest" \
             --endpoint-url "$ENDPOINT" --no-progress ${extra_args[@]+"${extra_args[@]}"}
