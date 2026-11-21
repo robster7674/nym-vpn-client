@@ -41,6 +41,9 @@ env:
   GIT_USER: NYM CI
   GIT_EMAIL: ci@nymtech.net
 
+permissions:
+  contents: read
+
 jobs:
   post-release:
     runs-on: arc-linux-latest
@@ -97,20 +100,20 @@ jobs:
             - bump Linux installer script
             - update flatpak package metainfo.xml
         run: |
-          git config --global user.name "${{ env.GIT_USER }}"
-          git config --global user.email "${{ env.GIT_EMAIL }}"
-          git switch -C ${{ env.GIT_BRANCH }}
+          git config --global user.name "$GIT_USER"
+          git config --global user.email "$GIT_EMAIL"
+          git switch -C "$GIT_BRANCH"
           git add .pkg/linux
           git add nym-vpn-app/.pkg/flatpak
           if git diff --cached --quiet; then
             echo "::notice:: nothing to commit, skipping PR"
             exit 0
           fi
-          git commit -m "${{ env.COMMIT_MSG }}"
-          git push --force origin ${{ env.GIT_BRANCH }}
-          existing=$(gh pr list --head "${{ env.GIT_BRANCH }}" --json number --jq 'length')
+          git commit -m "$COMMIT_MSG"
+          git push --force origin "$GIT_BRANCH"
+          existing=$(gh pr list --head "$GIT_BRANCH" --json number --jq 'length')
           if [[ "$existing" == "0" ]]; then
-            gh pr create --title '${{ env.COMMIT_MSG }}' --body '${{ env.PR_BODY }}' --base develop --reviewer "agentpietrucha"
+            gh pr create --title "$COMMIT_MSG" --body "$PR_BODY" --base develop --reviewer "agentpietrucha"
           else
-            echo "PR already exists for branch ${{ env.GIT_BRANCH }}, skipping"
+            echo "PR already exists for branch $GIT_BRANCH, skipping"
           fi

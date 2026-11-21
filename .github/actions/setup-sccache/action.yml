@@ -11,7 +11,8 @@ runs:
       shell: bash
       env:
         SCCACHE_PATH: ${{ env.SCCACHE_PATH }}
-      run: |
+      # Only constants and sccache-action's own path go into GITHUB_ENV
+      run: | # zizmor: ignore[github-env]
         echo "RUSTC_WRAPPER=$SCCACHE_PATH" >> "$GITHUB_ENV"
         echo "SCCACHE_DIR=$HOME/.cache/sccache" >> "$GITHUB_ENV"
         echo "SCCACHE_CACHE_SIZE=60G" >> "$GITHUB_ENV"
@@ -21,7 +22,7 @@ runs:
     - name: Configure sccache (Windows)
       if: runner.os == 'Windows'
       shell: pwsh
-      run: |
+      run: | # zizmor: ignore[github-env]
         Add-Content -Path $env:GITHUB_ENV -Value "RUSTC_WRAPPER=$env:SCCACHE_PATH" -Encoding utf8
         Add-Content -Path $env:GITHUB_ENV -Value "SCCACHE_DIR=$env:USERPROFILE\.cache\sccache" -Encoding utf8
         Add-Content -Path $env:GITHUB_ENV -Value "SCCACHE_CACHE_SIZE=60G" -Encoding utf8

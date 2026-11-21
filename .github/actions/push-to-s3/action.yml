@@ -32,10 +32,9 @@ inputs:
     required: false
     default: ""
     description: >
-      Extra flags appended verbatim to the `aws s3 sync`/`aws s3 cp` command,
-      e.g. `--delete` or `--exclude '*.tmp'`. INTERNAL USE ONLY: this is
-      interpolated into the shell as syntax, not data — pass only trusted,
-      workflow-authored literals, never user/PR-controlled input.
+      Extra flags appended to the `aws s3 sync`/`aws s3 cp` command, e.g.
+      `--delete` or `--exclude *.tmp`. Split on whitespace only: quotes are not
+      interpreted and globs are not expanded, so `*.tmp` reaches aws as-is.
 runs:
   using: composite
   steps:
@@ -113,16 +112,16 @@ runs:
         BUCKET: ${{ inputs.bucket }}
         DESTINATION: ${{ inputs.destination }}
         ENDPOINT: ${{ inputs.endpoint }}
+        ARGS: ${{ inputs.args }}
       run: |
         set -euo pipefail
         export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
         dest="s3://${BUCKET}/${DESTINATION}"
-        # NOTE: ${{ inputs.args }} below is the ONE deliberate verbatim interpolation
-        # (flags must word-split); it is documented INTERNAL-USE-ONLY trusted input.
+        read -rd '' -a extra_args <<< "$ARGS" || true
         if [ -d "$SRC" ]; then
           aws s3 sync "$SRC" "$dest" \
-            --endpoint-url "$ENDPOINT" --no-progress ${{ inputs.args }}
+            --endpoint-url "$ENDPOINT" --no-progress ${extra_args[@]+"${extra_args[@]}"}
         else
           aws s3 cp "$SRC" "$dest" \
-            --endpoint-url "$ENDPOINT" --no-progress ${{ inputs.args }}
+            --endpoint-url "$ENDPOINT" --no-progress ${extra_args[@]+"${extra_args[@]}"}
         fi

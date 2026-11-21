@@ -55,6 +55,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 jobs:
   # Builds both the Linux core binaries and the .deb packages in a single job
   # (the .deb step reuses the release build, so there is no second compile).

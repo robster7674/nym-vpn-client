@@ -13,6 +13,9 @@ env:
 
 # https://github.com/actions/runner-images/issues/1794#issuecomment-707217728
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: "custom-windows-11"

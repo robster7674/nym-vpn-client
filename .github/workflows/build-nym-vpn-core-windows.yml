@@ -23,6 +23,9 @@ env:
   CARGO_TERM_COLOR: always
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+permissions:
+  contents: read
+
 jobs:
   build-wireguard-go-windows:
     uses: ./.github/workflows/build-wireguard-go-windows.yml

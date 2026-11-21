@@ -12,6 +12,9 @@ env:
   CARGO_TERM_COLOR: always
   AGENT_ISSELFHOSTED: 1 # https://github.com/actions/setup-go/issues/432
 
+permissions:
+  contents: read
+
 jobs:
   build-libwg-windows:
     strategy:

@@ -52,6 +52,9 @@ env:
   CRON_NIGHTLY_ZIGBUILD: "0 2 * * *"
   CRON_WEEKDAY_LATEST_BETA: "0 4 * * 1-5"
 
+permissions:
+  contents: read
+
 jobs:
   resolve:
     name: Resolve binary source
@@ -168,6 +171,7 @@ jobs:
           targets: x86_64-unknown-linux-gnu
 
       - name: Install Zig
+        # zizmor: ignore[cache-poisoning] the e2e binaries are test-only and never published
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: 0.13.0
@@ -211,6 +215,7 @@ jobs:
 
       - name: Install Go
         if: needs.resolve.outputs.binary_source == 'zigbuild'
+        # zizmor: ignore[cache-poisoning] the e2e binaries are test-only and never published
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GOLANG_VERSION}}

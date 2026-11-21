@@ -105,6 +105,9 @@ env:
   SCCACHE_REDIS_PASSWORD: ${{ secrets.SCCACHE_REDIS_PASSWORD }}
   SCCACHE_REDIS_EXPIRATION: 86400
 
+permissions:
+  contents: read
+
 jobs:
   build-nym-vpn-app-android:
     name: build-nym-vpn-android (${{ inputs.build_flavor || 'fdroid' }})

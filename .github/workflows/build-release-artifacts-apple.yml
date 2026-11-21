@@ -84,6 +84,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 jobs:
   download-translations:
     uses: ./.github/workflows/crowdin-download.yml
