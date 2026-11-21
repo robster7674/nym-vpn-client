@@ -1,0 +1,39 @@
+# Advisories only: licenses and bans for the shared crates are governed by
+# nym-vpn-core/deny.toml. See https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html
+[advisories]
+# Only flag unmaintained crates we depend on directly
+unmaintained = "workspace"
+# Advisories present when the check was turned on
+ignore = [
+    { id = "RUSTSEC-2023-0071", reason = "rsa: Marvin attack, no fixed release; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0098", reason = "rustls-webpki 0.101; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0099", reason = "rustls-webpki 0.101; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.101; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0258", reason = "h2 0.3; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0346", reason = "rustls; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0347", reason = "rustls 0.23; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0348", reason = "rustls 0.23; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0349", reason = "rustls; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0367", reason = "zip; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0368", reason = "zip; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0369", reason = "zip; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0381", reason = "webpki-roots; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0382", reason = "rustls-webpki; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0383", reason = "webpki-root-certs; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0385", reason = "ctutils; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0391", reason = "zstd; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0398", reason = "zstd-safe; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0403", reason = "zstd-safe; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0410", reason = "zstd-sys; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0414", reason = "pulldown-cmark; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0418", reason = "libz-sys; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0429", reason = "zip; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0433", reason = "pulldown-cmark; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0544", reason = "libz-sys; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0545", reason = "zip; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0546", reason = "zip; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0547", reason = "zip; baseline, tracked in robster7674/nym-vpn-client#32" },
+    { id = "RUSTSEC-2026-0548", reason = "zip; baseline, tracked in robster7674/nym-vpn-client#32" },
+]
